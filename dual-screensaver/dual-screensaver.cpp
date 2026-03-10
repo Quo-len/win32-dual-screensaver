@@ -41,8 +41,8 @@ float g_PongSpeed = 15.0f;
 float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
 
-// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank, 5 = Julia Spirals, 6 = Starfield, 7 = DVD, 8 = Grid, 9 = Pong, 10 = Maze Generator
-int g_ModePrimary = 10;
+// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock
+int g_ModePrimary = 11;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
 
@@ -100,13 +100,18 @@ struct ScreenData {
     std::vector<MazeCell> mazeGrid;
     int mazeCols = 0;
     int mazeRows = 0;
-    int mazeState = 0; // 0=Init, 1=Generate, 2=Solve, 3=Wait
+    int mazeState = 0;
     int mazeStart = 0;
     int mazeEnd = 0;
     std::vector<int> mazeStack;
     std::vector<int> solveStack;
     DWORD lastMazeUpdate = 0;
     int mazeWaitTimer = 0;
+
+    // For Mode 11: Odometer Clock
+    float digitOffset[8] = { 0 };
+    char currentStr[16] = { 0 };
+    char targetStr[16] = { 0 };
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -185,8 +190,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     if (g_RandomMode) {
-        g_ModePrimary = rand() % 11;
-        g_ModeSecondary = rand() % 11;
+        g_ModePrimary = rand() % 12;
+        g_ModeSecondary = rand() % 12;
     }
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -951,7 +956,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             DeleteObject(hBrush);
         }
-        else if (mode == 10) { // Maze Generator and Solver
+        else if (mode == 10) {
             int cellSize = max(10, g_TextSize);
             int padding = 40;
             int mCols = (width - padding * 2) / cellSize;
@@ -988,14 +993,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (now - data->lastMazeUpdate > 16) {
                 data->lastMazeUpdate = now;
 
-                if (data->mazeState == 1) { // Generate
+                if (data->mazeState == 1) {
                     for (int step = 0; step < stepsPerFrame * 5 && !data->mazeStack.empty(); ++step) {
                         int current = data->mazeStack.back();
                         int cx = current % data->mazeCols;
                         int cy = current / data->mazeCols;
 
                         std::vector<int> neighbors;
-                        std::vector<int> dirs; // 0:Top, 1:Right, 2:Bottom, 3:Left
+                        std::vector<int> dirs;
                         if (cy > 0 && !data->mazeGrid[current - data->mazeCols].visited) { neighbors.push_back(current - data->mazeCols); dirs.push_back(0); }
                         if (cx < data->mazeCols - 1 && !data->mazeGrid[current + 1].visited) { neighbors.push_back(current + 1); dirs.push_back(1); }
                         if (cy < data->mazeRows - 1 && !data->mazeGrid[current + data->mazeCols].visited) { neighbors.push_back(current + data->mazeCols); dirs.push_back(2); }
@@ -1019,13 +1024,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         }
                     }
                     if (data->mazeStack.empty()) {
-                        data->mazeState = 2; // Move to solve
+                        data->mazeState = 2;
                         data->solveStack.push_back(data->mazeStart);
                         data->mazeGrid[data->mazeStart].solveVisited = true;
                         data->mazeGrid[data->mazeStart].inPath = true;
                     }
                 }
-                else if (data->mazeState == 2) { // Solve
+                else if (data->mazeState == 2) {
                     for (int step = 0; step < stepsPerFrame && !data->solveStack.empty(); ++step) {
                         int current = data->solveStack.back();
 
@@ -1056,7 +1061,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         }
                     }
                 }
-                else if (data->mazeState == 3) { // Wait before reset
+                else if (data->mazeState == 3) {
                     data->mazeWaitTimer--;
                     if (data->mazeWaitTimer <= 0) {
                         data->mazeState = 0;
@@ -1100,7 +1105,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
             }
 
-            // Draw start and end points
             if (data->mazeState > 0) {
                 int sx = (data->mazeStart % data->mazeCols) * cellSize + offsetX;
                 int sy = (data->mazeStart / data->mazeCols) * cellSize + offsetY;
@@ -1136,6 +1140,80 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             DeleteObject(hHeadBrush);
             DeleteObject(hStartBrush);
             DeleteObject(hEndBrush);
+        }
+        else if (mode == 11) { // Odometer Clock
+            int clockFontSize = max(30, height / 3);
+            HFONT hClockFont = CreateFontA(clockFontSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+                FIXED_PITCH | FF_MODERN, "Consolas");
+
+            HFONT hOldFont = (HFONT)SelectObject(memDC, hClockFont);
+
+            SYSTEMTIME st;
+            GetLocalTime(&st);
+
+            char newTime[16];
+            sprintf_s(newTime, "%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
+
+            if (data->currentStr[0] == '\0') {
+                strcpy_s(data->currentStr, newTime);
+                strcpy_s(data->targetStr, newTime);
+                for (int i = 0; i < 8; i++) data->digitOffset[i] = 0.0f;
+            }
+
+            for (int i = 0; i < 8; i++) {
+                if (data->targetStr[i] != newTime[i]) {
+                    data->targetStr[i] = newTime[i];
+                }
+            }
+
+            SetTextColor(memDC, RGB(0, 255, 150));
+            SetBkMode(memDC, TRANSPARENT);
+
+            SIZE sz;
+            GetTextExtentPoint32A(memDC, "0", 1, &sz);
+            int charW = sz.cx;
+            int charH = sz.cy;
+
+            int totalW = 8 * charW;
+            int startX = (width - totalW) / 2;
+            int startY = (height - charH) / 2;
+
+            for (int i = 0; i < 8; i++) {
+                if (data->currentStr[i] != data->targetStr[i]) {
+                    data->digitOffset[i] += 0.12f;
+                    if (data->digitOffset[i] >= 1.0f) {
+                        data->currentStr[i] = data->targetStr[i];
+                        data->digitOffset[i] = 0.0f;
+                    }
+                }
+
+                int x = startX + i * charW;
+                int y = startY;
+
+                HRGN hRgn = CreateRectRgn(x, y, x + charW, y + charH);
+                SelectClipRgn(memDC, hRgn);
+
+                if (data->currentStr[i] == data->targetStr[i]) {
+                    char str[2] = { data->currentStr[i], 0 };
+                    TextOutA(memDC, x, y, str, 1);
+                }
+                else {
+                    char strOld[2] = { data->currentStr[i], 0 };
+                    char targetOld[2] = { data->targetStr[i], 0 };
+
+                    int yOffset = (int)(data->digitOffset[i] * charH);
+
+                    TextOutA(memDC, x, y - yOffset, strOld, 1);
+                    TextOutA(memDC, x, y + charH - yOffset, targetOld, 1);
+                }
+
+                SelectClipRgn(memDC, NULL);
+                DeleteObject(hRgn);
+            }
+
+            SelectObject(memDC, hOldFont);
+            DeleteObject(hClockFont);
         }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -1275,8 +1353,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid" , L"Pong", L"Maze Generator" };
-        for (int i = 0; i < 11; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid" , L"Pong", L"Maze Generator", L"Odometer Clock" };
+        for (int i = 0; i < 12; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }
@@ -1370,7 +1448,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
             sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 
-            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 10, 0);
+            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 11, 0);
             SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
             SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, BST_UNCHECKED, 0);
         }
