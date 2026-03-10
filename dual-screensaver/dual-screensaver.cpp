@@ -32,7 +32,7 @@ int g_TextSize = 20;
 int g_GolCellSize = 2;
 int g_GolSpeed = 33;
 
-// 0 = Donut, 1 = Game of Life, 2 = Blank
+// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Blank
 int g_ModePrimary = 0;
 int g_ModeSecondary = 1;
 
@@ -45,14 +45,17 @@ struct ScreenData {
     float B = 0;
     int cols = 0;
     int rows = 0;
-    int stride = 0; 
-    std::vector<unsigned char> grid;      
-    std::vector<unsigned char> nextGrid;  
-    std::vector<uint32_t> pixels;        
+    int stride = 0;
+    std::vector<unsigned char> grid;
+    std::vector<unsigned char> nextGrid;
+    std::vector<uint32_t> pixels;
     DWORD lastGolUpdate = 0;
     HFONT hFont = NULL;
 
-
+    std::vector<int> matrixDrops;
+    std::vector<wchar_t> matrixChars;
+    std::vector<unsigned char> matrixIntensity;
+    HFONT hMatrixFont = NULL;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -212,6 +215,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             data->hFont = CreateFontA(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
                 FIXED_PITCH | FF_MODERN, "Consolas");
+
+            data->hMatrixFont = CreateFontW(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
+                OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+                FIXED_PITCH | FF_MODERN, L"MS Gothic");
         }
         SetTimer(hWnd, 1, 33, NULL);
         break;
@@ -236,11 +243,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         SetBkMode(memDC, OPAQUE);
         SetBkColor(memDC, RGB(0, 0, 0));
 
-        // Determine what to draw
         int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
         if (mode == 0) {
-            // DONUT
             SelectObject(memDC, data->hFont);
             TEXTMETRICA tm;
             GetTextMetricsA(memDC, &tm);
@@ -298,7 +303,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             data->B += g_BSpeed;
         }
         else if (mode == 1) {
-            // GAME OF LIFE - HYPER OPTIMIZED
             int targetCols = width / g_GolCellSize;
             int targetRows = height / g_GolCellSize;
 
@@ -308,14 +312,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (data->cols != targetCols || data->rows != targetRows || data->grid.empty()) {
                 data->cols = targetCols;
                 data->rows = targetRows;
-                data->stride = targetCols + 2; // +2 for ghost padding
+                data->stride = targetCols + 2;
 
                 int totalSize = data->stride * (targetRows + 2);
                 data->grid.assign(totalSize, 0);
                 data->nextGrid.assign(totalSize, 0);
                 data->pixels.assign(targetCols * targetRows, 0);
 
-                // Seed only the inner playable area
                 for (int y = 1; y <= data->rows; y++) {
                     for (int x = 1; x <= data->cols; x++) {
                         data->grid[y * data->stride + x] = ((rand() % 100) > 70) ? 1 : 0;
@@ -331,27 +334,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 int rows = data->rows;
                 int cols = data->cols;
 
-                // 1. UPDATE GHOST BOUNDARIES
-                // Copy top and bottom edges
                 for (int x = 1; x <= cols; x++) {
-                    grid[x] = grid[rows * stride + x];                     // Top ghost = actual bottom
-                    grid[(rows + 1) * stride + x] = grid[stride + x];      // Bottom ghost = actual top
+                    grid[x] = grid[rows * stride + x];
+                    grid[(rows + 1) * stride + x] = grid[stride + x];
                 }
-                // Copy left and right edges (including corners)
                 for (int y = 0; y <= rows + 1; y++) {
-                    grid[y * stride] = grid[y * stride + cols];            // Left ghost = actual right
-                    grid[y * stride + cols + 1] = grid[y * stride + 1];    // Right ghost = actual left
+                    grid[y * stride] = grid[y * stride + cols];
+                    grid[y * stride + cols + 1] = grid[y * stride + 1];
                 }
 
                 bool changed = false;
                 int aliveCount = 0;
 
-                // 2. INNER LOOP (No modulo, no if-statements for bounds)
                 for (int y = 1; y <= rows; y++) {
-                    int idx = y * stride + 1; // Start at first real cell in row
+                    int idx = y * stride + 1;
                     for (int x = 1; x <= cols; x++, idx++) {
 
-                        // Flat 1D array lookups are blazingly fast
                         int n = grid[idx - stride - 1] + grid[idx - stride] + grid[idx - stride + 1] +
                             grid[idx - 1] + grid[idx + 1] +
                             grid[idx + stride - 1] + grid[idx + stride] + grid[idx + stride + 1];
@@ -374,17 +372,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     }
                 }
 
-                // Swap pointers rapidly
                 data->grid.swap(data->nextGrid);
                 data->lastGolUpdate = now;
             }
 
-            // 3. RENDER VIA DIRECT MEMORY MANIPULATION
             uint32_t* px = data->pixels.data();
             unsigned char* grid = data->grid.data();
             int stride = data->stride;
 
-            // Translate 1s and 0s into raw hex colors (0x00RRGGBB)
             for (int y = 1; y <= data->rows; y++) {
                 int rowOffset = y * stride;
                 for (int x = 1; x <= data->cols; x++) {
@@ -392,25 +387,76 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
             }
 
-            // 4. HARDWARE SCALING
             BITMAPINFO bmi = { 0 };
             bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
             bmi.bmiHeader.biWidth = data->cols;
-            bmi.bmiHeader.biHeight = -data->rows; // Top-down DIB
+            bmi.bmiHeader.biHeight = -data->rows;
             bmi.bmiHeader.biPlanes = 1;
             bmi.bmiHeader.biBitCount = 32;
             bmi.bmiHeader.biCompression = BI_RGB;
 
-            // Blast the raw pixels directly to the screen memory, letting the GPU scale it
             StretchDIBits(
                 memDC,
-                0, 0, width, height,               // Destination dimensions (full screen)
-                0, 0, data->cols, data->rows,      // Source dimensions (cell count)
+                0, 0, width, height,
+                0, 0, data->cols, data->rows,
                 data->pixels.data(), &bmi,
                 DIB_RGB_COLORS, SRCCOPY
             );
         }
-        // If mode == 2 (Blank), we do nothing else, just leave it black.
+        else if (mode == 2) {
+            int m_fontSize = data->isPreview ? 10 : g_TextSize;
+            if (m_fontSize < 5) m_fontSize = 5;
+
+            int m_cols = width / m_fontSize;
+            int m_rows = height / m_fontSize;
+
+            if (m_cols <= 0) m_cols = 1;
+            if (m_rows <= 0) m_rows = 1;
+
+            if (data->matrixDrops.size() != m_cols || data->matrixChars.size() != m_cols * m_rows) {
+                data->matrixDrops.assign(m_cols, 0);
+                data->matrixChars.assign(m_cols * m_rows, L' ');
+                data->matrixIntensity.assign(m_cols * m_rows, 0);
+                for (int i = 0; i < m_cols; ++i) data->matrixDrops[i] = rand() % m_rows;
+            }
+
+            for (int x = 0; x < m_cols; x++) {
+                for (int y = 0; y < m_rows; y++) {
+                    int idx = y * m_cols + x;
+                    if (data->matrixIntensity[idx] > 0) {
+                        int v = data->matrixIntensity[idx] - (rand() % 25 + 5);
+                        data->matrixIntensity[idx] = v < 0 ? 0 : v;
+                    }
+                }
+
+                int headY = data->matrixDrops[x];
+                if (headY >= 0 && headY < m_rows) {
+                    int idx = headY * m_cols + x;
+                    data->matrixChars[idx] = 0x30A0 + (rand() % 96);
+                    data->matrixIntensity[idx] = 255;
+                }
+
+                data->matrixDrops[x]++;
+                if (data->matrixDrops[x] >= m_rows || (rand() % 100 > 95)) {
+                    data->matrixDrops[x] = 0;
+                }
+            }
+
+            SelectObject(memDC, data->hMatrixFont);
+            SetBkMode(memDC, TRANSPARENT);
+
+            for (int y = 0; y < m_rows; y++) {
+                for (int x = 0; x < m_cols; x++) {
+                    int idx = y * m_cols + x;
+                    int brightness = data->matrixIntensity[idx];
+                    if (brightness > 0) {
+                        COLORREF color = (brightness > 240) ? RGB(200, 255, 200) : RGB(0, brightness, 0);
+                        SetTextColor(memDC, color);
+                        TextOutW(memDC, x * m_fontSize, y * m_fontSize, &data->matrixChars[idx], 1);
+                    }
+                }
+            }
+        }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -442,6 +488,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         if (data) {
             if (data->hFont) DeleteObject(data->hFont);
+            if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
             delete data;
             SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
         }
@@ -525,9 +572,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        // Populate Comboboxes
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Blank" };
-        for (int i = 0; i < 3; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Blank" };
+        for (int i = 0; i < 4; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }

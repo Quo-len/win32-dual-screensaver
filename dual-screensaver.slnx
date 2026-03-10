@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="dual-screensaver/dual-screensaver.vcxproj" />
+  <Project Path="dual-screensaver/dual-screensaver.vcxproj" Id="16fc0550-969b-4b86-ba98-1a526fb4ff9a" />
 </Solution>
