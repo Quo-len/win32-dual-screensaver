@@ -22,6 +22,9 @@
 #define IDRESET_BTN           1011
 #define IDC_EDIT_EARTH_SPEED  1012
 #define IDC_CHECK_RANDOM      1013
+#define IDC_EDIT_PONG_SPEED   1014
+#define IDC_EDIT_MAZE_BUILD_SPEED 1015
+#define IDC_EDIT_MAZE_SOLVE_SPEED 1016
 
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
@@ -34,13 +37,23 @@ int g_TextSize = 20;
 int g_GolCellSize = 2;
 int g_GolSpeed = 33;
 float g_EarthSpeed = 0.05f;
+float g_PongSpeed = 15.0f;
+float g_MazeBuildSpeed = 10.0f;
+float g_MazeSolveSpeed = 10.0f;
 
-// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank, 5 = Julia Spirals
-int g_ModePrimary = 5;
+// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank, 5 = Julia Spirals, 6 = Starfield, 7 = DVD, 8 = Grid, 9 = Pong, 10 = Maze Generator
+int g_ModePrimary = 10;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
+
+struct MazeCell {
+    bool visited;
+    bool wallTop, wallRight, wallBottom, wallLeft;
+    bool solveVisited;
+    bool inPath;
+};
 
 struct ScreenData {
     bool isPrimary;
@@ -68,6 +81,32 @@ struct ScreenData {
 
     float logoX = 0, logoY = 0, logoDX = 3.0f, logoDY = 2.5f;
     int logoColorIndex = 0;
+
+    std::vector<std::string> hexGrid;
+    int hexCols = 0;
+    int hexRows = 0;
+    int activeRow = 0;
+    int activeCol = 0;
+    bool isRowActive = true;
+    DWORD lastHexUpdate = 0;
+
+    float pBallX = -1.0f;
+    float pBallY = -1.0f;
+    float pBallDX = 0.0f;
+    float pBallDY = 0.0f;
+    float pPadLeftY = 0.0f;
+    float pPadRightY = 0.0f;
+
+    std::vector<MazeCell> mazeGrid;
+    int mazeCols = 0;
+    int mazeRows = 0;
+    int mazeState = 0; // 0=Init, 1=Generate, 2=Solve, 3=Wait
+    int mazeStart = 0;
+    int mazeEnd = 0;
+    std::vector<int> mazeStack;
+    std::vector<int> solveStack;
+    DWORD lastMazeUpdate = 0;
+    int mazeWaitTimer = 0;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -96,6 +135,12 @@ void LoadSettings()
         RegQueryValueExW(hKey, L"GolSpeed", NULL, NULL, (LPBYTE)&g_GolSpeed, &size);
         size = sizeof(float);
         RegQueryValueExW(hKey, L"EarthSpeed", NULL, NULL, (LPBYTE)&g_EarthSpeed, &size);
+        size = sizeof(float);
+        RegQueryValueExW(hKey, L"PongSpeed", NULL, NULL, (LPBYTE)&g_PongSpeed, &size);
+        size = sizeof(float);
+        RegQueryValueExW(hKey, L"MazeBuildSpeed", NULL, NULL, (LPBYTE)&g_MazeBuildSpeed, &size);
+        size = sizeof(float);
+        RegQueryValueExW(hKey, L"MazeSolveSpeed", NULL, NULL, (LPBYTE)&g_MazeSolveSpeed, &size);
         size = sizeof(int);
         RegQueryValueExW(hKey, L"ModePrimary", NULL, NULL, (LPBYTE)&g_ModePrimary, &size);
         size = sizeof(int);
@@ -118,6 +163,9 @@ void SaveSettings()
         RegSetValueExW(hKey, L"GolCellSize", 0, REG_DWORD, (const BYTE*)&g_GolCellSize, sizeof(int));
         RegSetValueExW(hKey, L"GolSpeed", 0, REG_DWORD, (const BYTE*)&g_GolSpeed, sizeof(int));
         RegSetValueExW(hKey, L"EarthSpeed", 0, REG_DWORD, (const BYTE*)&g_EarthSpeed, sizeof(float));
+        RegSetValueExW(hKey, L"PongSpeed", 0, REG_DWORD, (const BYTE*)&g_PongSpeed, sizeof(float));
+        RegSetValueExW(hKey, L"MazeBuildSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeBuildSpeed, sizeof(float));
+        RegSetValueExW(hKey, L"MazeSolveSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeSolveSpeed, sizeof(float));
         RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
         RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
         RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
@@ -137,8 +185,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     if (g_RandomMode) {
-        g_ModePrimary = rand() % 6;
-        g_ModeSecondary = rand() % 6;
+        g_ModePrimary = rand() % 11;
+        g_ModeSecondary = rand() % 11;
     }
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -728,43 +776,367 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     }
                 }
             }
-            }
+        }
         else if (mode == 7) { // Classic Bouncing Logo
-                const char* logoText = "DVD";
-                SelectObject(memDC, data->hFont);
-                RECT calcRect = { 0 };
-                DrawTextA(memDC, logoText, -1, &calcRect, DT_CALCRECT);
-                int tw = calcRect.right - calcRect.left;
-                int th = calcRect.bottom - calcRect.top;
+            const char* logoText = "DVD";
+            SelectObject(memDC, data->hFont);
+            RECT calcRect = { 0 };
+            DrawTextA(memDC, logoText, -1, &calcRect, DT_CALCRECT);
+            int tw = calcRect.right - calcRect.left;
+            int th = calcRect.bottom - calcRect.top;
 
-                if (data->logoX == 0 && data->logoY == 0) {
-                    data->logoX = (float)(rand() % (width - tw));
-                    data->logoY = (float)(rand() % (height - th));
+            if (data->logoX == 0 && data->logoY == 0) {
+                data->logoX = (float)(rand() % (width - tw));
+                data->logoY = (float)(rand() % (height - th));
+            }
+
+            data->logoX += data->logoDX;
+            data->logoY += data->logoDY;
+
+            bool bounced = false;
+            if (data->logoX <= 0 || data->logoX + tw >= width) {
+                data->logoDX *= -1;
+                bounced = true;
+            }
+            if (data->logoY <= 0 || data->logoY + th >= height) {
+                data->logoDY *= -1;
+                bounced = true;
+            }
+            if (bounced) {
+                data->logoColorIndex = (data->logoColorIndex + 1) % 6;
+            }
+
+            COLORREF colors[6] = { RGB(255,0,0), RGB(0,255,0), RGB(50,50,255), RGB(255,255,0), RGB(255,0,255), RGB(0,255,255) };
+            SetTextColor(memDC, colors[data->logoColorIndex]);
+            SetBkMode(memDC, TRANSPARENT);
+            TextOutA(memDC, (int)data->logoX, (int)data->logoY, logoText, (int)strlen(logoText));
+        }
+        else if (mode == 8) {
+            int padding = 40;
+            int cellSize = g_TextSize * 2;
+            if (cellSize < 10) cellSize = 10;
+
+            int targetCols = (width - padding * 2) / cellSize;
+            int targetRows = (height - padding * 2) / cellSize;
+
+            if (targetCols <= 0) targetCols = 1;
+            if (targetRows <= 0) targetRows = 1;
+
+            if (data->hexCols != targetCols || data->hexRows != targetRows || data->hexGrid.empty()) {
+                data->hexCols = targetCols;
+                data->hexRows = targetRows;
+                data->hexGrid.assign(targetCols * targetRows, "00");
+                const char* codes[] = { "55", "BD", "1C", "E9", "7A", "FF" };
+                for (int i = 0; i < targetCols * targetRows; i++) {
+                    data->hexGrid[i] = codes[rand() % 6];
+                }
+                data->activeRow = rand() % targetRows;
+                data->activeCol = rand() % targetCols;
+                data->isRowActive = true;
+                data->lastHexUpdate = GetTickCount();
+            }
+
+            DWORD now = GetTickCount();
+            if (now - data->lastHexUpdate > 1000) {
+                if (data->isRowActive) {
+                    data->activeCol = rand() % data->hexCols;
+                    data->isRowActive = false;
+                }
+                else {
+                    data->activeRow = rand() % data->hexRows;
+                    data->isRowActive = true;
+                }
+                data->lastHexUpdate = now;
+            }
+
+            SelectObject(memDC, data->hFont);
+
+            int startX = (width - (data->hexCols * cellSize)) / 2;
+            int startY = (height - (data->hexRows * cellSize)) / 2;
+
+            for (int r = 0; r < data->hexRows; r++) {
+                for (int c = 0; c < data->hexCols; c++) {
+                    int idx = r * data->hexCols + c;
+
+                    COLORREF color = RGB(40, 200, 40);
+
+                    if (r == data->activeRow && c == data->activeCol) {
+                        color = RGB(0, 0, 0);
+                        SetBkMode(memDC, OPAQUE);
+                        SetBkColor(memDC, RGB(255, 0, 85));
+                    }
+                    else if ((data->isRowActive && r == data->activeRow) || (!data->isRowActive && c == data->activeCol)) {
+                        color = RGB(250, 250, 50);
+                        SetBkMode(memDC, TRANSPARENT);
+                    }
+                    else {
+                        SetBkMode(memDC, TRANSPARENT);
+                    }
+
+                    if (rand() % 1000 > 985) {
+                        const char* codes[] = { "55", "BD", "1C", "E9", "7A", "FF", "4B", "00" };
+                        data->hexGrid[idx] = codes[rand() % 8];
+                    }
+
+                    SetTextColor(memDC, color);
+                    TextOutA(memDC, startX + c * cellSize, startY + r * cellSize, data->hexGrid[idx].c_str(), 2);
+                }
+            }
+        }
+        else if (mode == 9) {
+            int padWidth = max(5, width / 70);
+            int padHeight = max(20, height / 6);
+            int ballSize = padWidth;
+
+            float speedX = g_PongSpeed;
+            float speedY = g_PongSpeed;
+
+            if (data->pBallX < 0.0f) {
+                data->pBallX = (float)(width / 2);
+                data->pBallY = (float)(height / 2);
+                data->pBallDX = speedX;
+                data->pBallDY = speedY;
+                data->pPadLeftY = (float)(height / 2 - padHeight / 2);
+                data->pPadRightY = (float)(height / 2 - padHeight / 2);
+            }
+
+            data->pBallDX = (data->pBallDX > 0) ? speedX : -speedX;
+            data->pBallDY = (data->pBallDY > 0) ? speedY : -speedY;
+
+            data->pBallX += data->pBallDX;
+            data->pBallY += data->pBallDY;
+
+            if (data->pBallY <= 0.0f) {
+                data->pBallY = 0.0f;
+                data->pBallDY *= -1.0f;
+            }
+            else if (data->pBallY + ballSize >= height) {
+                data->pBallY = height - ballSize;
+                data->pBallDY *= -1.0f;
+            }
+
+            if (data->pBallX <= padWidth) {
+                data->pBallX = padWidth;
+                data->pBallDX *= -1.0f;
+            }
+            else if (data->pBallX + ballSize >= width - padWidth) {
+                data->pBallX = width - padWidth - ballSize;
+                data->pBallDX *= -1.0f;
+            }
+
+            data->pPadLeftY = data->pBallY + (ballSize / 2.0f) - (padHeight / 2.0f);
+            data->pPadRightY = data->pBallY + (ballSize / 2.0f) - (padHeight / 2.0f);
+
+            if (data->pPadLeftY < 0.0f) data->pPadLeftY = 0.0f;
+            if (data->pPadLeftY > height - padHeight) data->pPadLeftY = (float)(height - padHeight);
+
+            if (data->pPadRightY < 0.0f) data->pPadRightY = 0.0f;
+            if (data->pPadRightY > height - padHeight) data->pPadRightY = (float)(height - padHeight);
+
+            HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
+
+            RECT rectLeft = { 0, (int)data->pPadLeftY, padWidth, (int)data->pPadLeftY + padHeight };
+            FillRect(memDC, &rectLeft, hBrush);
+
+            RECT rectRight = { width - padWidth, (int)data->pPadRightY, width, (int)data->pPadRightY + padHeight };
+            FillRect(memDC, &rectRight, hBrush);
+
+            RECT rectBall = { (int)data->pBallX, (int)data->pBallY, (int)data->pBallX + ballSize, (int)data->pBallY + ballSize };
+            FillRect(memDC, &rectBall, hBrush);
+
+            for (int i = 0; i < height; i += padHeight) {
+                RECT dash = { width / 2 - padWidth / 4, i + padHeight / 4, width / 2 + padWidth / 4, i + padHeight * 3 / 4 };
+                FillRect(memDC, &dash, hBrush);
+            }
+
+            DeleteObject(hBrush);
+        }
+        else if (mode == 10) { // Maze Generator and Solver
+            int cellSize = max(10, g_TextSize);
+            int padding = 40;
+            int mCols = (width - padding * 2) / cellSize;
+            int mRows = (height - padding * 2) / cellSize;
+
+            if (mCols <= 2) mCols = 3;
+            if (mRows <= 2) mRows = 3;
+
+            if (data->mazeCols != mCols || data->mazeRows != mRows || data->mazeGrid.empty() || data->mazeState == 0) {
+                data->mazeCols = mCols;
+                data->mazeRows = mRows;
+
+                data->mazeGrid.clear();
+                data->mazeGrid.assign(mCols * mRows, { false, true, true, true, true, false, false });
+                data->mazeState = 1;
+                data->mazeStack.clear();
+                data->solveStack.clear();
+
+                data->mazeStart = rand() % (mCols * mRows);
+                data->mazeEnd = rand() % (mCols * mRows);
+                while (data->mazeEnd == data->mazeStart) {
+                    data->mazeEnd = rand() % (mCols * mRows);
                 }
 
-                data->logoX += data->logoDX;
-                data->logoY += data->logoDY;
+                data->mazeStack.push_back(data->mazeStart);
+                data->mazeGrid[data->mazeStart].visited = true;
+                data->lastMazeUpdate = GetTickCount();
+                data->mazeWaitTimer = 0;
+            }
 
-                bool bounced = false;
-                if (data->logoX <= 0 || data->logoX + tw >= width) {
-                    data->logoDX *= -1;
-                    bounced = true;
-                }
-                if (data->logoY <= 0 || data->logoY + th >= height) {
-                    data->logoDY *= -1;
-                    bounced = true;
-                }
-                if (bounced) {
-                    data->logoColorIndex = (data->logoColorIndex + 1) % 6;
-                }
+            DWORD now = GetTickCount();
+            int stepsPerFrame = max(1, (int)(data->mazeState == 1 ? g_MazeBuildSpeed : g_MazeSolveSpeed));
 
-                COLORREF colors[6] = { RGB(255,0,0), RGB(0,255,0), RGB(50,50,255), RGB(255,255,0), RGB(255,0,255), RGB(0,255,255) };
-                SetTextColor(memDC, colors[data->logoColorIndex]);
-                SetBkMode(memDC, TRANSPARENT);
-                TextOutA(memDC, (int)data->logoX, (int)data->logoY, logoText, (int)strlen(logoText));
-                }
-      
+            if (now - data->lastMazeUpdate > 16) {
+                data->lastMazeUpdate = now;
 
+                if (data->mazeState == 1) { // Generate
+                    for (int step = 0; step < stepsPerFrame * 5 && !data->mazeStack.empty(); ++step) {
+                        int current = data->mazeStack.back();
+                        int cx = current % data->mazeCols;
+                        int cy = current / data->mazeCols;
+
+                        std::vector<int> neighbors;
+                        std::vector<int> dirs; // 0:Top, 1:Right, 2:Bottom, 3:Left
+                        if (cy > 0 && !data->mazeGrid[current - data->mazeCols].visited) { neighbors.push_back(current - data->mazeCols); dirs.push_back(0); }
+                        if (cx < data->mazeCols - 1 && !data->mazeGrid[current + 1].visited) { neighbors.push_back(current + 1); dirs.push_back(1); }
+                        if (cy < data->mazeRows - 1 && !data->mazeGrid[current + data->mazeCols].visited) { neighbors.push_back(current + data->mazeCols); dirs.push_back(2); }
+                        if (cx > 0 && !data->mazeGrid[current - 1].visited) { neighbors.push_back(current - 1); dirs.push_back(3); }
+
+                        if (!neighbors.empty()) {
+                            int r = rand() % neighbors.size();
+                            int next = neighbors[r];
+                            int dir = dirs[r];
+
+                            if (dir == 0) { data->mazeGrid[current].wallTop = false; data->mazeGrid[next].wallBottom = false; }
+                            else if (dir == 1) { data->mazeGrid[current].wallRight = false; data->mazeGrid[next].wallLeft = false; }
+                            else if (dir == 2) { data->mazeGrid[current].wallBottom = false; data->mazeGrid[next].wallTop = false; }
+                            else if (dir == 3) { data->mazeGrid[current].wallLeft = false; data->mazeGrid[next].wallRight = false; }
+
+                            data->mazeGrid[next].visited = true;
+                            data->mazeStack.push_back(next);
+                        }
+                        else {
+                            data->mazeStack.pop_back();
+                        }
+                    }
+                    if (data->mazeStack.empty()) {
+                        data->mazeState = 2; // Move to solve
+                        data->solveStack.push_back(data->mazeStart);
+                        data->mazeGrid[data->mazeStart].solveVisited = true;
+                        data->mazeGrid[data->mazeStart].inPath = true;
+                    }
+                }
+                else if (data->mazeState == 2) { // Solve
+                    for (int step = 0; step < stepsPerFrame && !data->solveStack.empty(); ++step) {
+                        int current = data->solveStack.back();
+
+                        if (current == data->mazeEnd) {
+                            data->mazeState = 3;
+                            data->mazeWaitTimer = 45;
+                            break;
+                        }
+
+                        int cx = current % data->mazeCols;
+                        int cy = current / data->mazeCols;
+
+                        std::vector<int> nextDirs;
+                        if (!data->mazeGrid[current].wallTop && !data->mazeGrid[current - data->mazeCols].solveVisited) nextDirs.push_back(current - data->mazeCols);
+                        if (!data->mazeGrid[current].wallRight && !data->mazeGrid[current + 1].solveVisited) nextDirs.push_back(current + 1);
+                        if (!data->mazeGrid[current].wallBottom && !data->mazeGrid[current + data->mazeCols].solveVisited) nextDirs.push_back(current + data->mazeCols);
+                        if (!data->mazeGrid[current].wallLeft && !data->mazeGrid[current - 1].solveVisited) nextDirs.push_back(current - 1);
+
+                        if (!nextDirs.empty()) {
+                            int next = nextDirs[0];
+                            data->mazeGrid[next].solveVisited = true;
+                            data->mazeGrid[next].inPath = true;
+                            data->solveStack.push_back(next);
+                        }
+                        else {
+                            data->mazeGrid[current].inPath = false;
+                            data->solveStack.pop_back();
+                        }
+                    }
+                }
+                else if (data->mazeState == 3) { // Wait before reset
+                    data->mazeWaitTimer--;
+                    if (data->mazeWaitTimer <= 0) {
+                        data->mazeState = 0;
+                    }
+                }
+            }
+
+            int offsetX = (width - (data->mazeCols * cellSize)) / 2;
+            int offsetY = (height - (data->mazeRows * cellSize)) / 2;
+
+            HPEN hWallPen = CreatePen(PS_SOLID, 2, RGB(0, 255, 0));
+            HPEN hOldPen = (HPEN)SelectObject(memDC, hWallPen);
+            HBRUSH hPathBrush = CreateSolidBrush(RGB(255, 0, 0));
+            HBRUSH hSolveBrush = CreateSolidBrush(RGB(50, 50, 150));
+            HBRUSH hHeadBrush = CreateSolidBrush(RGB(255, 255, 255));
+            HBRUSH hStartBrush = CreateSolidBrush(RGB(255, 255, 0));
+            HBRUSH hEndBrush = CreateSolidBrush(RGB(0, 255, 255));
+            HBRUSH hOldBrush = (HBRUSH)SelectObject(memDC, GetStockObject(NULL_BRUSH));
+
+            for (int cy = 0; cy < data->mazeRows; cy++) {
+                for (int cx = 0; cx < data->mazeCols; cx++) {
+                    int i = cy * data->mazeCols + cx;
+                    int px = offsetX + cx * cellSize;
+                    int py = offsetY + cy * cellSize;
+
+                    if (data->mazeGrid[i].inPath) {
+                        RECT rc = { px + cellSize / 4, py + cellSize / 4, px + cellSize - cellSize / 4, py + cellSize - cellSize / 4 };
+                        FillRect(memDC, &rc, hPathBrush);
+                    }
+                    else if (data->mazeGrid[i].solveVisited) {
+                        RECT rc = { px + cellSize / 3, py + cellSize / 3, px + cellSize - cellSize / 3, py + cellSize - cellSize / 3 };
+                        FillRect(memDC, &rc, hSolveBrush);
+                    }
+
+                    if (data->mazeGrid[i].visited) {
+                        if (data->mazeGrid[i].wallTop) { MoveToEx(memDC, px, py, NULL); LineTo(memDC, px + cellSize, py); }
+                        if (data->mazeGrid[i].wallBottom) { MoveToEx(memDC, px, py + cellSize, NULL); LineTo(memDC, px + cellSize, py + cellSize); }
+                        if (data->mazeGrid[i].wallLeft) { MoveToEx(memDC, px, py, NULL); LineTo(memDC, px, py + cellSize); }
+                        if (data->mazeGrid[i].wallRight) { MoveToEx(memDC, px + cellSize, py, NULL); LineTo(memDC, px + cellSize, py + cellSize); }
+                    }
+                }
+            }
+
+            // Draw start and end points
+            if (data->mazeState > 0) {
+                int sx = (data->mazeStart % data->mazeCols) * cellSize + offsetX;
+                int sy = (data->mazeStart / data->mazeCols) * cellSize + offsetY;
+                RECT sr = { sx + 2, sy + 2, sx + cellSize - 2, sy + cellSize - 2 };
+                FillRect(memDC, &sr, hStartBrush);
+
+                int ex = (data->mazeEnd % data->mazeCols) * cellSize + offsetX;
+                int ey = (data->mazeEnd / data->mazeCols) * cellSize + offsetY;
+                RECT er = { ex + 2, ey + 2, ex + cellSize - 2, ey + cellSize - 2 };
+                FillRect(memDC, &er, hEndBrush);
+            }
+
+            if (data->mazeState == 1 && !data->mazeStack.empty()) {
+                int current = data->mazeStack.back();
+                int cx = current % data->mazeCols;
+                int cy = current / data->mazeCols;
+                RECT rc = { offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, offsetX + (cx + 1) * cellSize - 2, offsetY + (cy + 1) * cellSize - 2 };
+                FillRect(memDC, &rc, hHeadBrush);
+            }
+            else if (data->mazeState == 2 && !data->solveStack.empty()) {
+                int current = data->solveStack.back();
+                int cx = current % data->mazeCols;
+                int cy = current / data->mazeCols;
+                RECT rc = { offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, offsetX + (cx + 1) * cellSize - 2, offsetY + (cy + 1) * cellSize - 2 };
+                FillRect(memDC, &rc, hHeadBrush);
+            }
+
+            SelectObject(memDC, hOldPen);
+            SelectObject(memDC, hOldBrush);
+            DeleteObject(hWallPen);
+            DeleteObject(hPathBrush);
+            DeleteObject(hSolveBrush);
+            DeleteObject(hHeadBrush);
+            DeleteObject(hStartBrush);
+            DeleteObject(hEndBrush);
+        }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -822,7 +1194,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
     HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
         WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-        CW_USEDEFAULT, CW_USEDEFAULT, 310, 530,
+        CW_USEDEFAULT, CW_USEDEFAULT, 310, 680,
         nullptr, nullptr, hInstance, nullptr);
 
     MSG msg;
@@ -873,6 +1245,21 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND h9 = CreateWindowW(L"STATIC", L"Spin Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
         HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL); y += 35;
 
+        HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
+        SendMessage(hL5, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+
+        HWND h10 = CreateWindowW(L"STATIC", L"Game Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+        HWND hPS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_PONG_SPEED, hInst, NULL); y += 35;
+
+        HWND hL6 = CreateWindowW(L"STATIC", L"Maze Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
+        SendMessage(hL6, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+
+        HWND h11 = CreateWindowW(L"STATIC", L"Build Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+        HWND hMB = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_MAZE_BUILD_SPEED, hInst, NULL); y += 30;
+
+        HWND h12 = CreateWindowW(L"STATIC", L"Solve Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+        HWND hMS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_MAZE_SOLVE_SPEED, hInst, NULL); y += 35;
+
         HWND hL3 = CreateWindowW(L"STATIC", L"Monitor Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
         SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
 
@@ -888,8 +1275,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo"};
-        for (int i = 0; i < 9; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid" , L"Pong", L"Maze Generator" };
+        for (int i = 0; i < 11; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }
@@ -908,6 +1295,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         SendMessage(hG2, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h9, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hES, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(h10, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(hPS, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(h11, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(hMB, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(h12, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(hMS, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h7, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hC1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h8, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
@@ -925,6 +1318,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         sprintf_s(buf, "%d", g_GolCellSize); SetWindowTextA(hG1, buf);
         sprintf_s(buf, "%d", g_GolSpeed); SetWindowTextA(hG2, buf);
         sprintf_s(buf, "%.3f", g_EarthSpeed); SetWindowTextA(hES, buf);
+        sprintf_s(buf, "%.1f", g_PongSpeed); SetWindowTextA(hPS, buf);
+        sprintf_s(buf, "%.1f", g_MazeBuildSpeed); SetWindowTextA(hMB, buf);
+        sprintf_s(buf, "%.1f", g_MazeSolveSpeed); SetWindowTextA(hMS, buf);
         SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
         SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
 
@@ -943,6 +1339,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf, 32); g_GolCellSize = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf, 32); g_GolSpeed = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf);
+            GetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf, 32); g_PongSpeed = (float)atof(buf);
+            GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
+            GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
 
             g_ModePrimary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
             g_ModeSecondary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
@@ -951,6 +1350,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
             if (g_GolCellSize < 1) g_GolCellSize = 1;
             if (g_GolSpeed < 10) g_GolSpeed = 10;
+            if (g_MazeBuildSpeed < 1) g_MazeBuildSpeed = 1.0f;
+            if (g_MazeSolveSpeed < 1) g_MazeSolveSpeed = 1.0f;
 
             SaveSettings();
             PostQuitMessage(0);
@@ -965,8 +1366,11 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             sprintf_s(buf, "%d", 2); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
             sprintf_s(buf, "%d", 33); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
             sprintf_s(buf, "%.3f", 0.05f); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
+            sprintf_s(buf, "%.1f", 15.0f); SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
+            sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
+            sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 
-            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 2, 0);
+            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 10, 0);
             SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
             SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, BST_UNCHECKED, 0);
         }
