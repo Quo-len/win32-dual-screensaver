@@ -62,6 +62,12 @@ struct ScreenData {
     HFONT hMatrixFont = NULL;
 
     DWORD startTime = 0;
+
+    struct Star { float x, y, z; };
+    std::vector<Star> stars;
+
+    float logoX = 0, logoY = 0, logoDX = 3.0f, logoDY = 2.5f;
+    int logoColorIndex = 0;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -692,6 +698,73 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             data->A += g_ASpeed * 0.5f;
         }
+        else if (mode == 6) { // 3D Starfield
+            if (data->stars.empty()) {
+                data->stars.resize(800);
+                for (auto& s : data->stars) {
+                    s.x = (rand() % 4000) - 2000.0f;
+                    s.y = (rand() % 4000) - 2000.0f;
+                    s.z = (rand() % 2000) + 1.0f;
+                }
+            }
+            for (auto& s : data->stars) {
+                s.z -= 8.0f;
+                if (s.z <= 1.0f) {
+                    s.x = (rand() % 4000) - 2000.0f;
+                    s.y = (rand() % 4000) - 2000.0f;
+                    s.z = 2000.0f;
+                }
+                int px = (int)((s.x / s.z) * 150) + width / 2;
+                int py = (int)((s.y / s.z) * 150) + height / 2;
+
+                if (px >= 0 && px < width && py >= 0 && py < height) {
+                    int brightness = 255 - (int)((s.z / 2000.0f) * 255);
+                    SetPixel(memDC, px, py, RGB(brightness, brightness, brightness));
+
+                    if (s.z < 500.0f) {
+                        SetPixel(memDC, px + 1, py, RGB(brightness, brightness, brightness));
+                        SetPixel(memDC, px, py + 1, RGB(brightness, brightness, brightness));
+                        SetPixel(memDC, px + 1, py + 1, RGB(brightness, brightness, brightness));
+                    }
+                }
+            }
+            }
+        else if (mode == 7) { // Classic Bouncing Logo
+                const char* logoText = "DVD";
+                SelectObject(memDC, data->hFont);
+                RECT calcRect = { 0 };
+                DrawTextA(memDC, logoText, -1, &calcRect, DT_CALCRECT);
+                int tw = calcRect.right - calcRect.left;
+                int th = calcRect.bottom - calcRect.top;
+
+                if (data->logoX == 0 && data->logoY == 0) {
+                    data->logoX = (float)(rand() % (width - tw));
+                    data->logoY = (float)(rand() % (height - th));
+                }
+
+                data->logoX += data->logoDX;
+                data->logoY += data->logoDY;
+
+                bool bounced = false;
+                if (data->logoX <= 0 || data->logoX + tw >= width) {
+                    data->logoDX *= -1;
+                    bounced = true;
+                }
+                if (data->logoY <= 0 || data->logoY + th >= height) {
+                    data->logoDY *= -1;
+                    bounced = true;
+                }
+                if (bounced) {
+                    data->logoColorIndex = (data->logoColorIndex + 1) % 6;
+                }
+
+                COLORREF colors[6] = { RGB(255,0,0), RGB(0,255,0), RGB(50,50,255), RGB(255,255,0), RGB(255,0,255), RGB(0,255,255) };
+                SetTextColor(memDC, colors[data->logoColorIndex]);
+                SetBkMode(memDC, TRANSPARENT);
+                TextOutA(memDC, (int)data->logoX, (int)data->logoY, logoText, (int)strlen(logoText));
+                }
+      
+
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -815,8 +888,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals" };
-        for (int i = 0; i < 6; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo"};
+        for (int i = 0; i < 9; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }
