@@ -21,6 +21,7 @@
 #define IDCANCEL_BTN          1010
 #define IDRESET_BTN           1011
 #define IDC_EDIT_EARTH_SPEED  1012
+#define IDC_CHECK_RANDOM      1013
 
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
@@ -34,9 +35,10 @@ int g_GolCellSize = 2;
 int g_GolSpeed = 33;
 float g_EarthSpeed = 0.05f;
 
-// 0 = Donut, 1 = Game of Life, 2 = Earth, 3 = Blank
+// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank
 int g_ModePrimary = 2;
 int g_ModeSecondary = 1;
+int g_RandomMode = 0; // 0 = False, 1 = True
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
@@ -53,6 +55,13 @@ struct ScreenData {
     std::vector<uint32_t> pixels;
     DWORD lastGolUpdate = 0;
     HFONT hFont = NULL;
+
+    std::vector<int> matrixDrops;
+    std::vector<wchar_t> matrixChars;
+    std::vector<unsigned char> matrixIntensity;
+    HFONT hMatrixFont = NULL;
+
+    DWORD startTime = 0;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -85,6 +94,8 @@ void LoadSettings()
         RegQueryValueExW(hKey, L"ModePrimary", NULL, NULL, (LPBYTE)&g_ModePrimary, &size);
         size = sizeof(int);
         RegQueryValueExW(hKey, L"ModeSecondary", NULL, NULL, (LPBYTE)&g_ModeSecondary, &size);
+        size = sizeof(int);
+        RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
         RegCloseKey(hKey);
     }
 }
@@ -103,6 +114,7 @@ void SaveSettings()
         RegSetValueExW(hKey, L"EarthSpeed", 0, REG_DWORD, (const BYTE*)&g_EarthSpeed, sizeof(float));
         RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
         RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
+        RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
         RegCloseKey(hKey);
     }
 }
@@ -116,6 +128,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     {
         ShowSettingsWindow(hInstance);
         return 0;
+    }
+
+    if (g_RandomMode) {
+        g_ModePrimary = rand() % 5;
+        g_ModeSecondary = rand() % 5;
     }
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -215,6 +232,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             data->hFont = CreateFontA(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
                 FIXED_PITCH | FF_MODERN, "Consolas");
+
+            data->hMatrixFont = CreateFontW(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
+                OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+                FIXED_PITCH | FF_MODERN, L"MS Gothic");
+
+            data->startTime = GetTickCount();
         }
         SetTimer(hWnd, 1, 33, NULL);
         break;
@@ -400,6 +423,60 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             );
         }
         else if (mode == 2) {
+            int m_fontSize = data->isPreview ? 10 : g_TextSize;
+            if (m_fontSize < 5) m_fontSize = 5;
+
+            int m_cols = width / m_fontSize;
+            int m_rows = height / m_fontSize;
+
+            if (m_cols <= 0) m_cols = 1;
+            if (m_rows <= 0) m_rows = 1;
+
+            if (data->matrixDrops.size() != m_cols || data->matrixChars.size() != m_cols * m_rows) {
+                data->matrixDrops.assign(m_cols, 0);
+                data->matrixChars.assign(m_cols * m_rows, L' ');
+                data->matrixIntensity.assign(m_cols * m_rows, 0);
+                for (int i = 0; i < m_cols; ++i) data->matrixDrops[i] = rand() % m_rows;
+            }
+
+            for (int x = 0; x < m_cols; x++) {
+                for (int y = 0; y < m_rows; y++) {
+                    int idx = y * m_cols + x;
+                    if (data->matrixIntensity[idx] > 0) {
+                        int v = data->matrixIntensity[idx] - (rand() % 25 + 5);
+                        data->matrixIntensity[idx] = v < 0 ? 0 : v;
+                    }
+                }
+
+                int headY = data->matrixDrops[x];
+                if (headY >= 0 && headY < m_rows) {
+                    int idx = headY * m_cols + x;
+                    data->matrixChars[idx] = 0x30A0 + (rand() % 96);
+                    data->matrixIntensity[idx] = 255;
+                }
+
+                data->matrixDrops[x]++;
+                if (data->matrixDrops[x] >= m_rows || (rand() % 100 > 95)) {
+                    data->matrixDrops[x] = 0;
+                }
+            }
+
+            SelectObject(memDC, data->hMatrixFont);
+            SetBkMode(memDC, TRANSPARENT);
+
+            for (int y = 0; y < m_rows; y++) {
+                for (int x = 0; x < m_cols; x++) {
+                    int idx = y * m_cols + x;
+                    int brightness = data->matrixIntensity[idx];
+                    if (brightness > 0) {
+                        COLORREF color = (brightness > 240) ? RGB(200, 255, 200) : RGB(0, brightness, 0);
+                        SetTextColor(memDC, color);
+                        TextOutW(memDC, x * m_fontSize, y * m_fontSize, &data->matrixChars[idx], 1);
+                    }
+                }
+            }
+        }
+        else if (mode == 3) {
             SelectObject(memDC, data->hFont);
             TEXTMETRICA tm;
             GetTextMetricsA(memDC, &tm);
@@ -414,7 +491,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             float R_x = min(W / 2.0f, H * 1.0f) * 0.9f;
             float R_y = R_x * 0.5f;
 
-            // Updated earth map [cite: 1]
             const char* earth_map[34] = {
                 "............................................................................................................................................",
                 "............................................................................................................................................",
@@ -499,8 +575,51 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
-            // Here we use the new g_EarthSpeed variable to control rotation
             data->A += g_EarthSpeed;
+        }
+        else if (mode == 4) {
+            DWORD elapsed = GetTickCount() - data->startTime;
+            int seconds = (elapsed / 1000) % 60;
+            int minutes = (elapsed / 60000) % 60;
+            int hours = (elapsed / 3600000);
+
+            char msg[128];
+            sprintf_s(msg, "< Away from PC for %02d hours, %02d minutes, %02d seconds >", hours, minutes, seconds);
+            int msgLen = (int)strlen(msg);
+
+            std::string topDashes(msgLen - 2, '_');
+            std::string bottomDashes(msgLen - 2, '-');
+
+            std::string cow = " " + topDashes + "\n" +
+                msg + "\n" +
+                " " + bottomDashes + "\n" +
+                "        \\   ^__^\n" +
+                "         \\  (oo)\\_______\n" +
+                "            (__)\\       )\\/\\\n" +
+                "                ||----w |\n" +
+                "                ||     ||";
+
+            SelectObject(memDC, data->hFont);
+            SetTextColor(memDC, RGB(200, 200, 200));
+            SetBkMode(memDC, TRANSPARENT);
+
+            RECT calcRect = { 0, 0, 0, 0 };
+            DrawTextA(memDC, cow.c_str(), -1, &calcRect, DT_CALCRECT | DT_LEFT);
+
+            int cowWidth = calcRect.right - calcRect.left;
+            int cowHeight = calcRect.bottom - calcRect.top;
+
+            RECT drawRect;
+            drawRect.left = (width / 2) + (int)(width * 0.05f); // 5% right from center
+
+            // Boundary safety so it doesn't get cut off on the right
+            if (drawRect.left + cowWidth > width) drawRect.left = width - cowWidth - 20;
+
+            drawRect.right = drawRect.left + cowWidth;
+            drawRect.bottom = height; // Padding from bottom
+            drawRect.top = drawRect.bottom - cowHeight;
+
+            DrawTextA(memDC, cow.c_str(), -1, &drawRect, DT_LEFT);
         }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -533,6 +652,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         if (data) {
             if (data->hFont) DeleteObject(data->hFont);
+            if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
             delete data;
             SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
         }
@@ -556,10 +676,9 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
     RegisterClassExW(&wcex);
 
-    // Increased window height from 430 to 480 to fit the new setting
     HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
         WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-        CW_USEDEFAULT, CW_USEDEFAULT, 310, 480,
+        CW_USEDEFAULT, CW_USEDEFAULT, 310, 530,
         nullptr, nullptr, hInstance, nullptr);
 
     MSG msg;
@@ -604,7 +723,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND h6 = CreateWindowW(L"STATIC", L"Speed (ms):", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
         HWND hG2 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_GOL_SPEED, hInst, NULL); y += 35;
 
-        // Added Earth Settings Section
         HWND hL4 = CreateWindowW(L"STATIC", L"Earth Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
         SendMessage(hL4, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
 
@@ -620,12 +738,14 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND h8 = CreateWindowW(L"STATIC", L"Secondary:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
         HWND hC2 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 130, y, 100, 100, hWnd, (HMENU)IDC_COMBO_SECONDARY, hInst, NULL); y += 35;
 
+        HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 20, y, 250, 20, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL); y += 35;
+
         HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 30, y, 70, 25, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Earth", L"Blank" };
-        for (int i = 0; i < 4; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank" };
+        for (int i = 0; i < 5; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }
@@ -642,12 +762,13 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         SendMessage(hG1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h6, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hG2, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
-        SendMessage(h9, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0)); // Earth speed label
-        SendMessage(hES, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0)); // Earth speed edit
+        SendMessage(h9, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(hES, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h7, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hC1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h8, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hC2, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(hRand, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hOk, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hReset, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hCancel, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
@@ -659,9 +780,11 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         sprintf_s(buf, "%d", g_TextSize); SetWindowTextA(hT, buf);
         sprintf_s(buf, "%d", g_GolCellSize); SetWindowTextA(hG1, buf);
         sprintf_s(buf, "%d", g_GolSpeed); SetWindowTextA(hG2, buf);
-        sprintf_s(buf, "%.3f", g_EarthSpeed); SetWindowTextA(hES, buf); // Load Earth Speed
+        sprintf_s(buf, "%.3f", g_EarthSpeed); SetWindowTextA(hES, buf);
         SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
         SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
+
+        SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, g_RandomMode ? BST_CHECKED : BST_UNCHECKED, 0);
 
         break;
     }
@@ -675,10 +798,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             GetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf, 32); g_TextSize = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf, 32); g_GolCellSize = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf, 32); g_GolSpeed = atoi(buf);
-            GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf); // Save Earth Speed
+            GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf);
 
             g_ModePrimary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
             g_ModeSecondary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
+
+            g_RandomMode = SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_GETCHECK, 0, 0) == BST_CHECKED ? 1 : 0;
 
             if (g_GolCellSize < 1) g_GolCellSize = 1;
             if (g_GolSpeed < 10) g_GolSpeed = 10;
@@ -695,10 +820,11 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             sprintf_s(buf, "%d", 20); SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
             sprintf_s(buf, "%d", 2); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
             sprintf_s(buf, "%d", 33); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
-            sprintf_s(buf, "%.3f", 0.05f); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf); // Reset Earth Speed
+            sprintf_s(buf, "%.3f", 0.05f); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
 
             SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 2, 0);
             SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
+            SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, BST_UNCHECKED, 0);
         }
         else if (LOWORD(wParam) == IDCANCEL_BTN)
         {
