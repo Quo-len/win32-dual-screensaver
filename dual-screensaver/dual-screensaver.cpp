@@ -124,7 +124,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     srand((unsigned int)time(NULL));
     LoadSettings();
 
-    if (lpCmdLine == nullptr || lpCmdLine[0] == L'\0' || wcsstr(lpCmdLine, L"/c") || wcsstr(lpCmdLine, L"/C"))
+    if (wcsstr(lpCmdLine, L"/c") || wcsstr(lpCmdLine, L"/C"))
     {
         ShowSettingsWindow(hInstance);
         return 0;
