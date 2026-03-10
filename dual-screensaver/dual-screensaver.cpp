@@ -277,14 +277,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             std::vector<float> z(W * H, 0.0f);
             std::vector<char> b(W * H, ' ');
 
-            float x_mult = W * 0.375f;
-            float y_mult = H * 0.6818f;
+            // Calculate dynamic scale and camera distance based on donut size
+            float K2 = g_DonutSize + 3.0f;
+            float proj_scale = K2 / (g_DonutSize + 1.0f);
+            float x_mult = W * 0.225f * proj_scale;
+            float y_mult = H * 0.409f * proj_scale;
 
             for (float j = 0; j < 6.28f; j += 0.07f) {
                 for (float i = 0; i < 6.28f; i += 0.02f) {
                     float c = sin(i), d = cos(j), e = sin(data->A), f = sin(j), g = cos(data->A);
                     float h = d + g_DonutSize;
-                    float D = 1 / (c * h * e + f * g + 5);
+                    float D = 1 / (c * h * e + f * g + K2); // Using dynamic Z camera distance here
                     float l = cos(i), m = cos(data->B), n = sin(data->B);
                     float t = c * h * g - f * e;
 
@@ -616,7 +619,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (drawRect.left + cowWidth > width) drawRect.left = width - cowWidth - 20;
 
             drawRect.right = drawRect.left + cowWidth;
-            drawRect.bottom = height; // Padding from bottom
+            drawRect.bottom = height - 50; // Padding from bottom
             drawRect.top = drawRect.bottom - cowHeight;
 
             DrawTextA(memDC, cow.c_str(), -1, &drawRect, DT_LEFT);
