@@ -35,10 +35,10 @@ int g_GolCellSize = 2;
 int g_GolSpeed = 33;
 float g_EarthSpeed = 0.05f;
 
-// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank
-int g_ModePrimary = 2;
+// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Earth, 4 = Blank, 5 = Julia Spirals
+int g_ModePrimary = 5;
 int g_ModeSecondary = 1;
-int g_RandomMode = 0; // 0 = False, 1 = True
+int g_RandomMode = 0;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
@@ -131,8 +131,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     if (g_RandomMode) {
-        g_ModePrimary = rand() % 5;
-        g_ModeSecondary = rand() % 5;
+        g_ModePrimary = rand() % 6;
+        g_ModeSecondary = rand() % 6;
     }
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -277,7 +277,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             std::vector<float> z(W * H, 0.0f);
             std::vector<char> b(W * H, ' ');
 
-            // Calculate dynamic scale and camera distance based on donut size
             float K2 = g_DonutSize + 3.0f;
             float proj_scale = K2 / (g_DonutSize + 1.0f);
             float x_mult = W * 0.225f * proj_scale;
@@ -287,7 +286,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 for (float i = 0; i < 6.28f; i += 0.02f) {
                     float c = sin(i), d = cos(j), e = sin(data->A), f = sin(j), g = cos(data->A);
                     float h = d + g_DonutSize;
-                    float D = 1 / (c * h * e + f * g + K2); // Using dynamic Z camera distance here
+                    float D = 1 / (c * h * e + f * g + K2);
                     float l = cos(i), m = cos(data->B), n = sin(data->B);
                     float t = c * h * g - f * e;
 
@@ -311,14 +310,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
 
             SetTextColor(memDC, RGB(0, 255, 0));
-
             RECT calcRect = rect;
             DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
 
             int textHeight = calcRect.bottom - calcRect.top;
             RECT textRect = rect;
             textRect.top = (textRect.bottom - textHeight) / 2;
-
             DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
             data->A += g_ASpeed;
@@ -568,14 +565,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
 
             SetTextColor(memDC, RGB(0, 255, 0));
-
             RECT calcRect = rect;
             DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
 
             int textHeight = calcRect.bottom - calcRect.top;
             RECT textRect = rect;
             textRect.top = (textRect.bottom - textHeight) / 2;
-
             DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
             data->A += g_EarthSpeed;
@@ -613,16 +608,89 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int cowHeight = calcRect.bottom - calcRect.top;
 
             RECT drawRect;
-            drawRect.left = (width / 2) + (int)(width * 0.05f); // 5% right from center
-
-            // Boundary safety so it doesn't get cut off on the right
+            drawRect.left = (width / 2) + (int)(width * 0.05f);
             if (drawRect.left + cowWidth > width) drawRect.left = width - cowWidth - 20;
 
             drawRect.right = drawRect.left + cowWidth;
-            drawRect.bottom = height - 50; // Padding from bottom
+            drawRect.bottom = height - 50;
             drawRect.top = drawRect.bottom - cowHeight;
 
             DrawTextA(memDC, cow.c_str(), -1, &drawRect, DT_LEFT);
+        }
+        else if (mode == 5) {
+            SelectObject(memDC, data->hFont);
+            TEXTMETRICA tm;
+            GetTextMetricsA(memDC, &tm);
+
+            int W = width / tm.tmAveCharWidth;
+            int H = height / tm.tmHeight;
+            if (W <= 0) W = 1;
+            if (H <= 0) H = 1;
+
+            std::vector<char> b(W * H, ' ');
+
+            double zoom = 1.0 + 0.15 * sin(data->A * 0.3);
+            double widthInComplex = 3.5 / zoom;
+            double heightInComplex = widthInComplex * ((double)H / W) * 2.0;
+
+            double minX = -widthInComplex / 2.0;
+            double minY = -heightInComplex / 2.0;
+
+            double dx = widthInComplex / W;
+            double dy = heightInComplex / H;
+
+            double cx = 0.7885 * cos(data->A * 0.5);
+            double cy = 0.7885 * sin(data->A * 0.5);
+
+            const char* charset = " .,-~:;=!*#$@";
+            const char* insideChars = "WM#0@&8Q";
+            int maxIter = 80;
+
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    double zx = minX + x * dx;
+                    double zy = minY + y * dy;
+                    int iter = 0;
+                    while (zx * zx + zy * zy < 4.0 && iter < maxIter) {
+                        double tmp = zx * zx - zy * zy + cx;
+                        zy = 2.0 * zx * zy + cy;
+                        zx = tmp;
+                        iter++;
+                    }
+                    if (iter == maxIter) {
+                        b[y * W + x] = insideChars[(x * 17 + y * 31) % 8];
+                    }
+                    else {
+                        if (iter < 3) {
+                            b[y * W + x] = ' ';
+                        }
+                        else {
+                            b[y * W + x] = charset[iter % 13];
+                        }
+                    }
+                }
+            }
+
+            std::string out;
+            out.reserve(W * H + H);
+            for (int k = 0; k < W * H; k++) {
+                out += b[k];
+                if ((k + 1) % W == 0) out += '\n';
+            }
+
+            SetTextColor(memDC, RGB(255, 255, 255));
+            SetBkMode(memDC, TRANSPARENT);
+
+            RECT calcRect = rect;
+            DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
+
+            int textHeight = calcRect.bottom - calcRect.top;
+            RECT textRect = rect;
+            textRect.top = (textRect.bottom - textHeight) / 2;
+
+            DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
+
+            data->A += g_ASpeed * 0.5f;
         }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -747,8 +815,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank" };
-        for (int i = 0; i < 5; i++) {
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals" };
+        for (int i = 0; i < 6; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
         }
