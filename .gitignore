@@ -1,0 +1,38 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.tlog
+*.lastbuildstate
+*.ilk
+*.pdb
+*.idb
+*.obj
+*.ipch
+*.iobj
+*.pch
+*.sbr
+*.bsc
+*.aps
+*.ncb
+*.opendb
+
+# Logs
+*.log
+
+# NuGet
+packages/
+*.nupkg
+
+# Windows screensaver output
+*.scr
