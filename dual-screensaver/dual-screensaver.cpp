@@ -20,6 +20,7 @@
 #define IDOK_BTN              1009
 #define IDCANCEL_BTN          1010
 #define IDRESET_BTN           1011
+#define IDC_EDIT_EARTH_SPEED  1012
 
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
@@ -31,9 +32,10 @@ float g_DonutSize = 2.0f;
 int g_TextSize = 20;
 int g_GolCellSize = 2;
 int g_GolSpeed = 33;
+float g_EarthSpeed = 0.05f;
 
-// 0 = Donut, 1 = Game of Life, 2 = Matrix, 3 = Blank
-int g_ModePrimary = 0;
+// 0 = Donut, 1 = Game of Life, 2 = Earth, 3 = Blank
+int g_ModePrimary = 2;
 int g_ModeSecondary = 1;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
@@ -51,11 +53,6 @@ struct ScreenData {
     std::vector<uint32_t> pixels;
     DWORD lastGolUpdate = 0;
     HFONT hFont = NULL;
-
-    std::vector<int> matrixDrops;
-    std::vector<wchar_t> matrixChars;
-    std::vector<unsigned char> matrixIntensity;
-    HFONT hMatrixFont = NULL;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -82,6 +79,8 @@ void LoadSettings()
         RegQueryValueExW(hKey, L"GolCellSize", NULL, NULL, (LPBYTE)&g_GolCellSize, &size);
         size = sizeof(int);
         RegQueryValueExW(hKey, L"GolSpeed", NULL, NULL, (LPBYTE)&g_GolSpeed, &size);
+        size = sizeof(float);
+        RegQueryValueExW(hKey, L"EarthSpeed", NULL, NULL, (LPBYTE)&g_EarthSpeed, &size);
         size = sizeof(int);
         RegQueryValueExW(hKey, L"ModePrimary", NULL, NULL, (LPBYTE)&g_ModePrimary, &size);
         size = sizeof(int);
@@ -101,6 +100,7 @@ void SaveSettings()
         RegSetValueExW(hKey, L"TextSize", 0, REG_DWORD, (const BYTE*)&g_TextSize, sizeof(int));
         RegSetValueExW(hKey, L"GolCellSize", 0, REG_DWORD, (const BYTE*)&g_GolCellSize, sizeof(int));
         RegSetValueExW(hKey, L"GolSpeed", 0, REG_DWORD, (const BYTE*)&g_GolSpeed, sizeof(int));
+        RegSetValueExW(hKey, L"EarthSpeed", 0, REG_DWORD, (const BYTE*)&g_EarthSpeed, sizeof(float));
         RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
         RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
         RegCloseKey(hKey);
@@ -215,10 +215,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             data->hFont = CreateFontA(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
                 FIXED_PITCH | FF_MODERN, "Consolas");
-
-            data->hMatrixFont = CreateFontW(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
-                OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                FIXED_PITCH | FF_MODERN, L"MS Gothic");
         }
         SetTimer(hWnd, 1, 33, NULL);
         break;
@@ -404,58 +400,107 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             );
         }
         else if (mode == 2) {
-            int m_fontSize = data->isPreview ? 10 : g_TextSize;
-            if (m_fontSize < 5) m_fontSize = 5;
+            SelectObject(memDC, data->hFont);
+            TEXTMETRICA tm;
+            GetTextMetricsA(memDC, &tm);
 
-            int m_cols = width / m_fontSize;
-            int m_rows = height / m_fontSize;
+            int W = width / tm.tmAveCharWidth;
+            int H = height / tm.tmHeight;
+            if (W <= 0) W = 1;
+            if (H <= 0) H = 1;
 
-            if (m_cols <= 0) m_cols = 1;
-            if (m_rows <= 0) m_rows = 1;
+            std::vector<char> b(W * H, ' ');
 
-            if (data->matrixDrops.size() != m_cols || data->matrixChars.size() != m_cols * m_rows) {
-                data->matrixDrops.assign(m_cols, 0);
-                data->matrixChars.assign(m_cols * m_rows, L' ');
-                data->matrixIntensity.assign(m_cols * m_rows, 0);
-                for (int i = 0; i < m_cols; ++i) data->matrixDrops[i] = rand() % m_rows;
-            }
+            float R_x = min(W / 2.0f, H * 1.0f) * 0.9f;
+            float R_y = R_x * 0.5f;
 
-            for (int x = 0; x < m_cols; x++) {
-                for (int y = 0; y < m_rows; y++) {
-                    int idx = y * m_cols + x;
-                    if (data->matrixIntensity[idx] > 0) {
-                        int v = data->matrixIntensity[idx] - (rand() % 25 + 5);
-                        data->matrixIntensity[idx] = v < 0 ? 0 : v;
+            // Updated earth map [cite: 1]
+            const char* earth_map[34] = {
+                "............................................................................................................................................",
+                "............................................................................................................................................",
+                "..................................+++++++..+++++++++++++++++++..............................................................................",
+                "......................+.+++++..+.+.+++++........++++++++++++++.............................+..........++++++++++++++..+.....++..............",
+                "......++++++++++++++++++++++++++++++++..++++.....++++++++++.................++++++++.....+++++++++++++++++++++++++++++++++++++++++++++++++++",
+                "......+++++++++++++++++++++++++++++.....++++......++++...................++++.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.",
+                "........++.......+++++++++++++++++......++++++......................+....++++..++++++++++++++++++++++++++++++++++++++++++++++......++.......",
+                "....................++++++++++++++++++.+++++++++....................++..++++++++++++++++++++++++++++++++++++++++++++++++++++.......+........",
+                "......................+++++++++++++++++++++++........................+++++++++++++++++++++++++++++++++++++++++++++++++++++++................",
+                "......................+++++++++++++++++++++........................++++...+.+++++....++++.+++++++++++++++++++++++++++++++...................",
+                "......................+++++++++++++++++++..........................+++........+..++++++++..+++++++++++++++++++++++++...+....+...............",
+                ".........................++++++++++++++............................+++++++++..+....++++++++++++++++++++++++++++++++++.......................",
+                "..........................++++++......+..........................++++++++++++++++++++++++++++++++++++++++++++++++++++.......................",
+                ".............................+++................................++++++++++++++++++++.++++++++....+++++++++++++++++..........................",
+                "...............................++.++............................+++++++++++++++++++++.+++++.......++++.....+++++............................",
+                "....................................++..........................+++++++++++++++++++++++++..........++.......+.++............................",
+                "........................................+++++++..................++++++++++++++++++++++++...................................................",
+                ".......................................+++++++++++........................++++++++++++++.....................+...+++........................",
+                ".......................................++++++++++++++++...................++++++++++++.......................++..++........++...............",
+                ".......................................+++++++++++++++++...................++++++++++.......................................++..............",
+                "........................................+++++++++++++++....................+++++++++++..................................+++..+..............",
+                "..........................................+++++++++++++....................+++++++++...++............................++++++++++.............",
+                "...........................................+++++++++........................++++++++...+..........................+++++++++++++++...........",
+                "..........................................+++++++++.........................++++++................................+++++++++++++++...........",
+                "..........................................+++++++............................+++...................................+++....+++++++...........",
+                "..........................................++++................................................................................+.............",
+                ".........................................++++...............................................................................................",
+                ".........................................+++................................................................................................",
+                "............................................................................................................................................",
+                "............................................................................................................................................",
+                "............................................................................................................................................",
+                "............................................++.....................................+.++++++++++++..+++++++++++++++++++++++++++++++++........",
+                "....................+++++++...++++++++++++++++.................+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++......",
+                "..........+++++++++++++++++++++++++++++++..........+....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++......."
+            };
+
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    float cx = (x - W / 2.0f);
+                    float cy = (y - H / 2.0f);
+
+                    float nx = cx / R_x;
+                    float ny = cy / R_y;
+                    float d2 = nx * nx + ny * ny;
+
+                    if (d2 <= 1.0f) {
+                        float nz = sqrt(1.0f - d2);
+                        float lat = asin(ny);
+                        float lon = atan2(nx, nz) + data->A;
+
+                        float u = (lon + 3.14159f) / (2.0f * 3.14159f);
+                        float v = (lat + 3.14159f / 2.0f) / 3.14159f;
+
+                        u = u - floor(u);
+                        if (v < 0.0f) v = 0.0f;
+                        if (v > 0.999f) v = 0.999f;
+
+                        int map_x = (int)(u * 140) % 140;
+                        int map_y = (int)(v * 34) % 34;
+
+                        b[y * W + x] = earth_map[map_y][map_x];
                     }
                 }
-
-                int headY = data->matrixDrops[x];
-                if (headY >= 0 && headY < m_rows) {
-                    int idx = headY * m_cols + x;
-                    data->matrixChars[idx] = 0x30A0 + (rand() % 96);
-                    data->matrixIntensity[idx] = 255;
-                }
-
-                data->matrixDrops[x]++;
-                if (data->matrixDrops[x] >= m_rows || (rand() % 100 > 95)) {
-                    data->matrixDrops[x] = 0;
-                }
             }
 
-            SelectObject(memDC, data->hMatrixFont);
-            SetBkMode(memDC, TRANSPARENT);
-
-            for (int y = 0; y < m_rows; y++) {
-                for (int x = 0; x < m_cols; x++) {
-                    int idx = y * m_cols + x;
-                    int brightness = data->matrixIntensity[idx];
-                    if (brightness > 0) {
-                        COLORREF color = (brightness > 240) ? RGB(200, 255, 200) : RGB(0, brightness, 0);
-                        SetTextColor(memDC, color);
-                        TextOutW(memDC, x * m_fontSize, y * m_fontSize, &data->matrixChars[idx], 1);
-                    }
-                }
+            std::string out;
+            out.reserve(W * H + H);
+            for (int k = 0; k < W * H; k++) {
+                out += b[k];
+                if ((k + 1) % W == 0) out += '\n';
             }
+
+            SetTextColor(memDC, RGB(0, 255, 0));
+
+            RECT calcRect = rect;
+            DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
+
+            int textHeight = calcRect.bottom - calcRect.top;
+            RECT textRect = rect;
+            textRect.top = (textRect.bottom - textHeight) / 2;
+
+            DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
+
+            // Here we use the new g_EarthSpeed variable to control rotation
+            data->A += g_EarthSpeed;
         }
 
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -488,7 +533,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         if (data) {
             if (data->hFont) DeleteObject(data->hFont);
-            if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
             delete data;
             SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
         }
@@ -512,9 +556,10 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
     RegisterClassExW(&wcex);
 
+    // Increased window height from 430 to 480 to fit the new setting
     HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
         WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-        CW_USEDEFAULT, CW_USEDEFAULT, 310, 430,
+        CW_USEDEFAULT, CW_USEDEFAULT, 310, 480,
         nullptr, nullptr, hInstance, nullptr);
 
     MSG msg;
@@ -559,6 +604,13 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND h6 = CreateWindowW(L"STATIC", L"Speed (ms):", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
         HWND hG2 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_GOL_SPEED, hInst, NULL); y += 35;
 
+        // Added Earth Settings Section
+        HWND hL4 = CreateWindowW(L"STATIC", L"Earth Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
+        SendMessage(hL4, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+
+        HWND h9 = CreateWindowW(L"STATIC", L"Spin Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+        HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL); y += 35;
+
         HWND hL3 = CreateWindowW(L"STATIC", L"Monitor Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
         SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
 
@@ -572,7 +624,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
         HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Blank" };
+        const WCHAR* options[] = { L"Donut", L"Game of Life", L"Earth", L"Blank" };
         for (int i = 0; i < 4; i++) {
             SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
             SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
@@ -590,6 +642,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         SendMessage(hG1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h6, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hG2, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+        SendMessage(h9, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0)); // Earth speed label
+        SendMessage(hES, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0)); // Earth speed edit
         SendMessage(h7, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(hC1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
         SendMessage(h8, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
@@ -605,6 +659,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         sprintf_s(buf, "%d", g_TextSize); SetWindowTextA(hT, buf);
         sprintf_s(buf, "%d", g_GolCellSize); SetWindowTextA(hG1, buf);
         sprintf_s(buf, "%d", g_GolSpeed); SetWindowTextA(hG2, buf);
+        sprintf_s(buf, "%.3f", g_EarthSpeed); SetWindowTextA(hES, buf); // Load Earth Speed
         SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
         SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
 
@@ -620,6 +675,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             GetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf, 32); g_TextSize = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf, 32); g_GolCellSize = atoi(buf);
             GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf, 32); g_GolSpeed = atoi(buf);
+            GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf); // Save Earth Speed
 
             g_ModePrimary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
             g_ModeSecondary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
@@ -639,8 +695,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             sprintf_s(buf, "%d", 20); SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
             sprintf_s(buf, "%d", 2); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
             sprintf_s(buf, "%d", 33); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
+            sprintf_s(buf, "%.3f", 0.05f); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf); // Reset Earth Speed
 
-            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 0, 0);
+            SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 2, 0);
             SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
         }
         else if (LOWORD(wParam) == IDCANCEL_BTN)
