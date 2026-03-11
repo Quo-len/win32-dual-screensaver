@@ -80,4 +80,9 @@ struct ScreenData {
     std::vector<int> fireGrid;
     int fireWidth = 0;
     int fireHeight = 0;
+
+    uint64_t hexBaseAddress = 0x00007FF000000000;
+    int hexDumpScrollDelay = 0;
+    HFONT hHexFont = NULL;
+    int hexLastWidth = 0;
 };
