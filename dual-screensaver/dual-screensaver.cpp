@@ -41,18 +41,74 @@ float g_PongSpeed = 15.0f;
 float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
 
-// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock
+// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field
 int g_ModePrimary = 11;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
+static const int perm[512] = {
+	151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
+	190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
+	88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
+	77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
+	102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
+	135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
+	5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
+	223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
+	129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
+	251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
+	49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
+	138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,
+	151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
+	190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
+	88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
+	77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
+	102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
+	135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
+	5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
+	223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
+	129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
+	251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
+	49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
+	138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+};
+
+float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+float lerp(float t, float a, float b) { return a + t * (b - a); }
+float grad(int hash, float x, float y, float z) {
+	int h = hash & 15;
+	float u = h < 8 ? x : y, v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+	return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+}
+float perlin(float x, float y, float z) {
+	int X = (int)floor(x) & 255, Y = (int)floor(y) & 255, Z = (int)floor(z) & 255;
+	x -= floor(x); y -= floor(y); z -= floor(z);
+	float u = fade(x), v = fade(y), w = fade(z);
+	int A = perm[X] + Y, AA = perm[A] + Z, AB = perm[A + 1] + Z;
+	int B = perm[X + 1] + Y, BA = perm[B] + Z, BB = perm[B + 1] + Z;
+	return lerp(w, lerp(v, lerp(u, grad(perm[AA], x, y, z),
+		grad(perm[BA], x - 1, y, z)),
+		lerp(u, grad(perm[AB], x, y - 1, z),
+			grad(perm[BB], x - 1, y - 1, z))),
+		lerp(v, lerp(u, grad(perm[AA + 1], x, y, z - 1),
+			grad(perm[BA + 1], x - 1, y, z - 1)),
+			lerp(u, grad(perm[AB + 1], x, y - 1, z - 1),
+				grad(perm[BB + 1], x - 1, y - 1, z - 1))));
+}
+
 struct MazeCell {
 	bool visited;
 	bool wallTop, wallRight, wallBottom, wallLeft;
 	bool solveVisited;
 	bool inPath;
+};
+
+struct FlowParticle {
+	float x, y;
+	int life;
+	COLORREF color;
 };
 
 struct ScreenData {
@@ -108,10 +164,12 @@ struct ScreenData {
 	DWORD lastMazeUpdate = 0;
 	int mazeWaitTimer = 0;
 
-	// For Mode 11: Odometer Clock
 	float digitOffset[8] = { 0 };
 	char currentStr[16] = { 0 };
 	char targetStr[16] = { 0 };
+
+	std::vector<FlowParticle> flowParticles;
+	float flowZOff = 0.0f;
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -190,8 +248,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	if (g_RandomMode) {
-		g_ModePrimary = rand() % 12;
-		g_ModeSecondary = rand() % 12;
+		g_ModePrimary = rand() % 13;
+		g_ModeSecondary = rand() % 13;
 	}
 
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -671,7 +729,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (drawRect.left + cowWidth > width) drawRect.left = width - cowWidth - 20;
 
 			drawRect.right = drawRect.left + cowWidth;
-			drawRect.bottom = height - 50;
+			drawRect.bottom = height;
 			drawRect.top = drawRect.bottom - cowHeight;
 
 			DrawTextA(memDC, cow.c_str(), -1, &drawRect, DT_LEFT);
@@ -790,7 +848,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				dvdFontSize,
 				0, 0, 0,
 				FW_HEAVY,
-				FALSE, // italic off for precise bounds
+				FALSE,
 				FALSE, FALSE,
 				DEFAULT_CHARSET,
 				OUT_DEFAULT_PRECIS,
@@ -1260,6 +1318,43 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			SelectObject(memDC, hOldFont);
 			DeleteObject(hClockFont);
 		}
+		else if (mode == 12) { // Perlin Noise Flow Field
+			int numParticles = 4000;
+			if (data->flowParticles.empty()) {
+				data->flowParticles.resize(numParticles);
+				for (auto& p : data->flowParticles) {
+					p.x = (float)(rand() % width);
+					p.y = (float)(rand() % height);
+					p.life = rand() % 150 + 50;
+					p.color = RGB(rand() % 100 + 50, rand() % 150 + 100, 255);
+				}
+			}
+
+			float scl = 0.005f;
+			for (auto& p : data->flowParticles) {
+				float angle = perlin(p.x * scl, p.y * scl, data->flowZOff) * 3.14159f * 4.0f;
+				float vx = cos(angle) * 3.5f;
+				float vy = sin(angle) * 3.5f;
+
+				p.x += vx;
+				p.y += vy;
+				p.life--;
+
+				if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height || p.life <= 0) {
+					p.x = (float)(rand() % width);
+					p.y = (float)(rand() % height);
+					p.life = rand() % 150 + 50;
+				}
+
+				HPEN hPen = CreatePen(PS_SOLID, 2, p.color);
+				HPEN hOldPen = (HPEN)SelectObject(memDC, hPen);
+				MoveToEx(memDC, (int)(p.x - vx * 5.0f), (int)(p.y - vy * 5.0f), NULL);
+				LineTo(memDC, (int)p.x, (int)p.y);
+				SelectObject(memDC, hOldPen);
+				DeleteObject(hPen);
+			}
+			data->flowZOff += 0.003f;
+		}
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -1398,8 +1493,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid" , L"Pong", L"Maze Generator", L"Odometer Clock" };
-		for (int i = 0; i < 12; i++) {
+		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid" , L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field" };
+		for (int i = 0; i < 13; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}
