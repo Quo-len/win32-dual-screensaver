@@ -1,3 +1,4 @@
+#include "Defaults.h"
 #include "framework.h"
 #include "dual-screensaver.h"
 #include "Settings.h"
@@ -14,33 +15,32 @@ HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
 WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
 
-float g_ASpeed = 0.04f;
-float g_BSpeed = 0.02f;
-float g_DonutSize = 2.0f;
-float g_DonutDistance = 3.0f;
-int g_TextSize = 20;
-int g_GolCellSize = 2;
-int g_GolSpeed = 33;
-float g_EarthSpeed = 0.05f;
-float g_PongSpeed = 25.0f;
-float g_MazeBuildSpeed = 10.0f;
-float g_MazeSolveSpeed = 10.0f;
-float g_PerlinScale = 0.002f;
+int g_TextSize = DEFAULT_TEXTSIZE;
+float g_ASpeed = DEFAULT_ASPEED;
+float g_BSpeed = DEFAULT_BSPEED;
+float g_DonutSize = DEFAULT_DONUTSIZE;
+float g_DonutDistance = DEFAULT_DONUTDISTANCE;
+int g_GolCellSize = DEFAULT_GOLCELLSIZE;
+int g_GolSpeed = DEFAULT_GOLSPEED;
+float g_EarthSpeed = DEFAULT_EARTHSPEED;
+float g_PongSpeed = DEFAULT_PONGSPEED;
+float g_DvdSpeed = DEFAULT_DVDSPEED;
+float g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED;
+float g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED;
+float g_PerlinScale = DEFAULT_PERLINSCALE;
 
-
-int g_ModePrimary = 11;
-int g_ModeSecondary = 1;
-int g_RandomMode = 0;
+int g_ModePrimary = DEFAULT_MODEPRIMARY;
+int g_ModeSecondary = DEFAULT_MODESECONDARY;
+int g_RandomMode = DEFAULT_RANDOMMODE;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
-
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
 static const RenderFn g_renderers[] = {
 	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort, 
+	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort,
 	RenderRandomSort
 };
 
@@ -77,6 +77,8 @@ void LoadSettings()
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"PongSpeed", NULL, NULL, (LPBYTE)&g_PongSpeed, &size);
 		size = sizeof(float);
+		RegQueryValueExW(hKey, L"DvdSpeed", NULL, NULL, (LPBYTE)&g_DvdSpeed, &size);
+		size = sizeof(float);
 		RegQueryValueExW(hKey, L"MazeBuildSpeed", NULL, NULL, (LPBYTE)&g_MazeBuildSpeed, &size);
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"MazeSolveSpeed", NULL, NULL, (LPBYTE)&g_MazeSolveSpeed, &size);
@@ -106,6 +108,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"GolSpeed", 0, REG_DWORD, (const BYTE*)&g_GolSpeed, sizeof(int));
 		RegSetValueExW(hKey, L"EarthSpeed", 0, REG_DWORD, (const BYTE*)&g_EarthSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"PongSpeed", 0, REG_DWORD, (const BYTE*)&g_PongSpeed, sizeof(float));
+		RegSetValueExW(hKey, L"DvdSpeed", 0, REG_DWORD, (const BYTE*)&g_DvdSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"MazeBuildSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeBuildSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"MazeSolveSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeSolveSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"PerlinScale", 0, REG_DWORD, (const BYTE*)&g_PerlinScale, sizeof(float));
@@ -234,9 +237,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 				FIXED_PITCH | FF_MODERN, L"MS Gothic");
 
-			data->startTime = GetTickCount();
+			data->startTime = GetTickCount64();
 
-			unsigned int monitorSeed = (unsigned int)GetTickCount() + (rand() % 10000);
+			unsigned int monitorSeed = (unsigned int)GetTickCount64() + (rand() % 10000);
 			initPerlin(monitorSeed, data->perm);
 		}
 		SetTimer(hWnd, 1, 33, NULL);
@@ -265,7 +268,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
 		if (mode >= 0 && mode < NUM_SCREENSAVERS)
-            g_renderers[mode](memDC, data, width, height, rect);
+			g_renderers[mode](memDC, data, width, height, rect);
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -390,11 +393,15 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		y = 5;
 
+
 		HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL5, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
 		HWND h10 = CreateWindowW(L"STATIC", L"Speed:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
-		HWND hPS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PONG_SPEED, hInst, NULL); y += secH;
+		HWND hPS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PONG_SPEED, hInst, NULL); y += rowH;
+
+		HWND h10b = CreateWindowW(L"STATIC", L"DVD Speed:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hDS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_DVD_SPEED, hInst, NULL); y += secH;
 
 		HWND hL6 = CreateWindowW(L"STATIC", L"Maze Settings", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL6, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
@@ -436,15 +443,15 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
 		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
 								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
 								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort",
-								   L"Sorting Algorithms" 
-								 };
+								   L"Sorting Algorithms"
+		};
 		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
@@ -463,6 +470,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.1f", g_MazeBuildSpeed);SetWindowTextA(hMB, buf);
 		sprintf_s(buf, "%.1f", g_MazeSolveSpeed);SetWindowTextA(hMS, buf);
 		sprintf_s(buf, "%.4f", g_PerlinScale);   SetWindowTextA(hPerlinScale, buf);
+		sprintf_s(buf, "%.1f", g_DvdSpeed); SetWindowTextA(hDS, buf);
+
 		SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
 		SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
 		SendMessage(hRand, BM_SETCHECK, g_RandomMode ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -481,6 +490,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf, 32); g_GolSpeed = atoi(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf, 32); g_PongSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_DVD_SPEED, buf, 32); g_DvdSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf, 32); g_PerlinScale = (float)atof(buf);
@@ -500,21 +510,22 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		else if (LOWORD(wParam) == IDRESET_BTN)
 		{
 			char buf[32];
-			sprintf_s(buf, "%.3f", 0.04f);  SetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf);
-			sprintf_s(buf, "%.3f", 0.02f);  SetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf);
-			sprintf_s(buf, "%.1f", 2.0f);   SetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf);
-			sprintf_s(buf, "%.1f", 3.0f);   SetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf);
-			sprintf_s(buf, "%d", 20);      SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
-			sprintf_s(buf, "%d", 2);       SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
-			sprintf_s(buf, "%d", 33);      SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
-			sprintf_s(buf, "%.3f", 0.05f);  SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
-			sprintf_s(buf, "%.1f", 25.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
-			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
-			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
-			sprintf_s(buf, "%.4f", 0.002f); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
-			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 11, 0);
-			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
-			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, BST_UNCHECKED, 0);
+			sprintf_s(buf, "%.3f", DEFAULT_ASPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf);
+			sprintf_s(buf, "%.3f", DEFAULT_BSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_DONUTSIZE);   SetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_DONUTDISTANCE);   SetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf);
+			sprintf_s(buf, "%d", DEFAULT_TEXTSIZE);      SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
+			sprintf_s(buf, "%d", DEFAULT_GOLCELLSIZE);       SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
+			sprintf_s(buf, "%d", DEFAULT_GOLSPEED);      SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
+			sprintf_s(buf, "%.3f", DEFAULT_EARTHSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_PONGSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_DVDSPEED);   SetDlgItemTextA(hWnd, IDC_EDIT_DVD_SPEED, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_MAZEBUILDSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
+			sprintf_s(buf, "%.1f", DEFAULT_MAZESOLVESPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
+			sprintf_s(buf, "%.4f", DEFAULT_PERLINSCALE); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
+			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, DEFAULT_MODEPRIMARY, 0);
+			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, DEFAULT_MODESECONDARY, 0);
+			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, DEFAULT_RANDOMMODE ? BST_CHECKED : BST_UNCHECKED, 0);
 		}
 		else if (LOWORD(wParam) == IDCANCEL_BTN)
 		{

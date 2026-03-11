@@ -25,6 +25,11 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
     if (data->logoX == 0 && data->logoY == 0) {
         data->logoX = (float)(rand() % max(1, width - tw));
         data->logoY = (float)(rand() % max(1, height - visualHeight));
+        // Initialize direction with speed
+        float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
+        extern float g_DvdSpeed;
+        data->logoDX = cosf(angle) * g_DvdSpeed;
+        data->logoDY = sinf(angle) * g_DvdSpeed;
     }
 
     data->logoX += data->logoDX;

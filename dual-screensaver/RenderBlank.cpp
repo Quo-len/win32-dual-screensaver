@@ -5,7 +5,7 @@
 #include <string>
 
 void RenderBlank(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    DWORD elapsed = GetTickCount() - data->startTime;
+    DWORD elapsed = GetTickCount64() - data->startTime;
     int seconds = (elapsed / 1000) % 60;
     int minutes = (elapsed / 60000) % 60;
     int hours = (elapsed / 3600000);

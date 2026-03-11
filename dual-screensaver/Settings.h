@@ -4,7 +4,6 @@
 #define IDC_EDIT_ASPEED           1001
 #define IDC_EDIT_BSPEED           1002
 #define IDC_EDIT_SIZE             1003
-#define IDC_EDIT_DONUT_DISTANCE   1018
 #define IDC_EDIT_TEXTSIZE         1004
 #define IDC_EDIT_GOL_SIZE         1005
 #define IDC_EDIT_GOL_SPEED        1006
@@ -19,9 +18,9 @@
 #define IDC_EDIT_MAZE_BUILD_SPEED 1015
 #define IDC_EDIT_MAZE_SOLVE_SPEED 1016
 #define IDC_EDIT_PERLIN_SCALE     1017
-
-#define IDC_EDIT_PERLIN_SCALE     1017
 #define IDC_EDIT_DONUT_DISTANCE   1018
+#define IDC_EDIT_DVD_SPEED        1019
+
 
 
 extern float g_ASpeed;

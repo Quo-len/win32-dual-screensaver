@@ -133,6 +133,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Defaults.h" />
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Perlin.h" />
