@@ -5,7 +5,7 @@
 #include <math.h>
 
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    int numParticles = 12000;
+    int numParticles = 6000;
 
     if (data->cols != width || data->rows != height || (int)data->pixels.size() != width * height) {
         data->cols = width;
@@ -23,19 +23,9 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     }
 
     uint32_t* px = data->pixels.data();
-    int totalPixels = width * height;
-    for (int i = 0; i < totalPixels; i++) {
-        if (px[i]) {
-            uint32_t c = px[i];
-            uint32_t r = (c >> 16) & 0xFF;
-            uint32_t g = (c >> 8) & 0xFF;
-            uint32_t b = c & 0xFF;
-            if (r > 0) r--;
-            if (g > 0) g--;
-            if (b > 0) b--;
-            px[i] = (r << 16) | (g << 8) | b;
-        }
-    }
+    // We'll fade only the pixels touched by particles this frame.
+    std::vector<int> faded;
+    faded.reserve(numParticles * 2);
 
     for (auto& p : data->flowParticles) {
         float angle = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm) * 3.14159f * 4.0f;
@@ -68,18 +58,32 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
             int px_x = (int)cx;
             int py_y = (int)cy;
             if (px_x >= 0 && px_x < width && py_y >= 0 && py_y < height) {
-                uint32_t c = px[py_y * width + px_x];
+                int idx = py_y * width + px_x;
+                uint32_t c = px[idx];
                 uint32_t r = ((c >> 16) & 0xFF) + 35;
                 uint32_t g = ((c >> 8) & 0xFF) + 35;
                 uint32_t b = (c & 0xFF) + 40;
                 if (r > 255) r = 255;
                 if (g > 255) g = 255;
                 if (b > 255) b = 255;
-                px[py_y * width + px_x] = (r << 16) | (g << 8) | b;
+                px[idx] = (r << 16) | (g << 8) | b;
+                faded.push_back(idx);
             }
             cx += xInc;
             cy += yInc;
         }
+    }
+
+    // Fade only the pixels touched by particles this frame.
+    for (int idx : faded) {
+        uint32_t c = px[idx];
+        uint32_t r = (c >> 16) & 0xFF;
+        uint32_t g = (c >> 8) & 0xFF;
+        uint32_t b = c & 0xFF;
+        if (r > 0) r--;
+        if (g > 0) g--;
+        if (b > 0) b--;
+        px[idx] = (r << 16) | (g << 8) | b;
     }
     data->flowZOff += 0.0008f;
 

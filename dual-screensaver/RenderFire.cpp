@@ -38,7 +38,7 @@ void RenderFire(HDC memDC, ScreenData* data, int width, int height, const RECT& 
         int heat = data->fireGrid[i];
 
         COLORREF color;
-        if (heat > 15) color = RGB(99, 143, 189);     // #638FBD
+        if (heat > 15) color = RGB(99, 143, 189);
         else if (heat > 9) color = RGB(255, 255, 85);
         else if (heat > 4) color = RGB(255, 85, 85);
         else color = RGB(128, 128, 128);
