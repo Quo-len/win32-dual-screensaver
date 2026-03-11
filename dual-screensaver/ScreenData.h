@@ -85,4 +85,29 @@ struct ScreenData {
     int hexDumpScrollDelay = 0;
     HFONT hHexFont = NULL;
     int hexLastWidth = 0;
+
+    std::vector<int> bogoArray;
+    bool bogoSorted = false;
+    int bogoAttempts = 0;
+    long long bogoComparisons = 0;
+    int bogoWaitTimer = 0;
+
+    std::vector<int> sortArray;
+    int sortState = 0;
+    int sortAlgo = 0;
+    int sortI = 0, sortJ = 0, sortMin = 0;
+    bool sortFlag = false;
+    int sortSweepIdx = 0;
+    int sortWait = 0;
+    int sortRed1 = -1, sortRed2 = -1;
+    char sortAlgoName[32] = { 0 };
+    int sortSubState = 0;
+    std::vector<int> sortStack;
+    std::vector<int> sortOutput;
+    int sortGap = 0;
+    int sortCurrSize = 1;
+    int sortLeftStart = 0;
+    int sortExp = 1;
+    long long sortComparisons = 0;
+    long long sortSwaps = 0;
 };

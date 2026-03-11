@@ -17,3 +17,5 @@ void RenderClock(HDC memDC, ScreenData* data, int width, int height, const RECT&
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderFire(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

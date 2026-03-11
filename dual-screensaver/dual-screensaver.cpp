@@ -78,8 +78,8 @@ void LoadSettings()
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
 
-		if (g_ModePrimary < 0 || g_ModePrimary > 14) g_ModePrimary = 11;
-		if (g_ModeSecondary < 0 || g_ModeSecondary > 14) g_ModeSecondary = 1;
+		if (g_ModePrimary < 0 || g_ModePrimary > 16) g_ModePrimary = 11;
+		if (g_ModeSecondary < 0 || g_ModeSecondary > 16) g_ModeSecondary = 1;
 
 		RegCloseKey(hKey);
 	}
@@ -121,8 +121,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	if (g_RandomMode) {
-		g_ModePrimary = rand() % 15;
-		g_ModeSecondary = rand() % 15;
+		g_ModePrimary = rand() % 16;
+		g_ModeSecondary = rand() % 16;
 	}
 
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -204,7 +204,7 @@ static const RenderFn g_renderers[] = {
 	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin, RenderFire, RenderMemoryDump
+	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort, RenderRandomSort
 };
 
 
@@ -417,8 +417,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump" };
-		for (int i = 0; i < 15; i++) {
+		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort", L"Sorting Algorithms" };
+		for (int i = 0; i < 17; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}
