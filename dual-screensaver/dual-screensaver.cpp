@@ -22,18 +22,15 @@ int g_TextSize = 20;
 int g_GolCellSize = 2;
 int g_GolSpeed = 33;
 float g_EarthSpeed = 0.05f;
-float g_PongSpeed = 15.0f;
+float g_PongSpeed = 25.0f;
 float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
 float g_PerlinScale = 0.002f;
 
 
-// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field, ...
 int g_ModePrimary = 11;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
-
-
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
@@ -343,24 +340,21 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	{
 	case WM_CREATE:
 	{
-		// --- BOLDER, BIGGER FONTS ---
 		HFONT hBold = CreateFontW(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
 		HFONT hFont = CreateFontW(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
-		// --- SPACIOUS LAYOUT ---
 		const int col1X = 25;
 		const int col2X = 380;
 		const int lblW = 140;
 		const int edtW = 140;
-		const int rowH = 38;  // Increased height for bigger fonts
-		const int secH = 50;  // Spacing between sections
+		const int rowH = 38;
+		const int secH = 50;
 
 		int y = 5;
 
-		// --- COLUMN 1 ---
 		HWND hL1 = CreateWindowW(L"STATIC", L"Donut Settings", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL1, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
@@ -394,7 +388,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND h9 = CreateWindowW(L"STATIC", L"Spin:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
 		HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL);
 
-		// --- COLUMN 2 ---
 		y = 5;
 
 		HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
@@ -427,13 +420,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND h8 = CreateWindowW(L"STATIC", L"Secondary:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
 		HWND hC2 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, col2X + 150, y, edtW, 300, hWnd, (HMENU)IDC_COMBO_SECONDARY, hInst, NULL);
 
-		// --- FOOTER ---
 		y = 460;
 		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, col1X, y, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
 
 		int btnW = 100;
 		int btnH = 35;
-		int rightBtnX = 400; // Buttons shifted to the right
+		int rightBtnX = 400;
 
 		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
 			rightBtnX, y, btnW, btnH, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
@@ -444,11 +436,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		// --- APPLY FONT ---
 		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
 		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		// Fill Comboboxes
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
 								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
@@ -460,7 +450,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}
 
-		// Set Initial Values
 		char buf[32];
 		sprintf_s(buf, "%.3f", g_ASpeed);        SetWindowTextA(hA, buf);
 		sprintf_s(buf, "%.3f", g_BSpeed);        SetWindowTextA(hB, buf);
@@ -519,7 +508,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			sprintf_s(buf, "%d", 2);       SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
 			sprintf_s(buf, "%d", 33);      SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
 			sprintf_s(buf, "%.3f", 0.05f);  SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
-			sprintf_s(buf, "%.1f", 15.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
+			sprintf_s(buf, "%.1f", 25.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 			sprintf_s(buf, "%.4f", 0.002f); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);

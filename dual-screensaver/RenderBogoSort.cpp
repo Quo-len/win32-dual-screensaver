@@ -5,12 +5,10 @@
 void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     int numItems = 100;
 
-    // State 0: Initialize and do an initial shuffle
     if (data->bogoArray.empty() || data->sortState == 0) {
         data->bogoArray.clear();
         for (int i = 1; i <= numItems; i++) data->bogoArray.push_back(i);
 
-        // Initial shuffle so it doesn't start already sorted
         for (int i = numItems - 1; i > 0; i--) {
             int j = rand() % (i + 1);
             std::swap(data->bogoArray[i], data->bogoArray[j]);
@@ -22,11 +20,10 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
         data->sortSweepIdx = 0;
     }
 
-    // State 1: Checking and Bogo Shuffling
     if (data->sortState == 1) {
         bool sorted = true;
         for (size_t i = 1; i < data->bogoArray.size(); i++) {
-            data->bogoComparisons++; // Track every single comparison check
+            data->bogoComparisons++;
             if (data->bogoArray[i - 1] > data->bogoArray[i]) {
                 sorted = false;
                 break;
@@ -34,11 +31,10 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
         }
 
         if (sorted && data->bogoAttempts > 0) {
-            data->sortState = 2; // Move to Sweep phase
+            data->sortState = 2;
             data->sortSweepIdx = 0;
         }
         else {
-            // SHUFFLE!
             for (int i = numItems - 1; i > 0; i--) {
                 int j = rand() % (i + 1);
                 std::swap(data->bogoArray[i], data->bogoArray[j]);
@@ -46,21 +42,18 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
             data->bogoAttempts++;
         }
     }
-    // State 2: Sweeping Green from left to right
     else if (data->sortState == 2) {
-        data->sortSweepIdx += 1; // +1 instead of +2 because we only have 8 items
+        data->sortSweepIdx += 1;
         if (data->sortSweepIdx >= numItems) {
             data->sortState = 3;
             data->sortWait = 0;
         }
     }
-    // State 3: Pause to admire the miracle, then reset
     else if (data->sortState == 3) {
         data->sortWait++;
         if (data->sortWait > 90) data->sortState = 0;
     }
 
-    // Styling: Match RenderRandomSort exactly
     int barWidth = width / numItems;
     if (barWidth < 1) barWidth = 1;
     int maxBarHeight = height - 150;
@@ -73,7 +66,6 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
     for (int i = 0; i < numItems; i++) {
         HBRUSH brush = defaultBrush;
 
-        // Apply sweep/done styling
         if (data->sortState == 2 && i <= data->sortSweepIdx) brush = greenBrush;
         else if (data->sortState == 3) brush = greenBrush;
 

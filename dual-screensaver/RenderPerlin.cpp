@@ -23,7 +23,6 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     }
 
     uint32_t* px = data->pixels.data();
-    // We'll fade only the pixels touched by particles this frame.
     std::vector<int> faded;
     faded.reserve(numParticles * 2);
 
@@ -74,7 +73,6 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
         }
     }
 
-    // Fade only the pixels touched by particles this frame.
     for (int idx : faded) {
         uint32_t c = px[idx];
         uint32_t r = (c >> 16) & 0xFF;

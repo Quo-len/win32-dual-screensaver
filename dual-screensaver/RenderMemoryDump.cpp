@@ -3,14 +3,12 @@
 #include "Settings.h"
 
 void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    // Calculate a font size that fits exactly 78 characters horizontally
     if (data->hexLastWidth != width || data->hHexFont == NULL) {
         if (data->hHexFont) DeleteObject(data->hHexFont);
 
-        int fontHeight = (width / 78) * 2; // Approximate height for standard monospace aspect ratio
-        if (fontHeight < 8) fontHeight = 8; // Prevent it from getting too small in preview mode
+        int fontHeight = (width / 78) * 2;
+        if (fontHeight < 8) fontHeight = 8;
 
-        // Use CLEARTYPE_QUALITY so the large text stays crisp and smooth
         data->hHexFont = CreateFontA(fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             FIXED_PITCH | FF_MODERN, "Consolas");
@@ -29,11 +27,9 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
     int lines = height / cHeight;
     if (lines == 0) lines = 1;
 
-    // Center the single column on the screen
     int startX = (width - (78 * cWidth)) / 2;
     if (startX < 0) startX = 0;
 
-    // Control scroll speed
     if (++data->hexDumpScrollDelay > 1) {
         data->hexBaseAddress += 16;
         data->hexDumpScrollDelay = 0;
@@ -42,7 +38,6 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
     uint32_t seed = (uint32_t)(data->hexBaseAddress ^ (data->hexBaseAddress >> 32));
     uint64_t currentAddr = data->hexBaseAddress;
 
-    // Draw lines (+1 to ensure we cover the bottom edge smoothly)
     for (int i = 0; i < lines + 1; i++) {
         char addrPart[16];
         sprintf_s(addrPart, "%08llx", currentAddr & 0xFFFFFFFF);
@@ -69,16 +64,13 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
         asciiPart[17] = '|';
         asciiPart[18] = '\0';
 
-        // Drawing Address (Medium Gray)
         SetTextColor(memDC, RGB(150, 150, 150));
         TextOutA(memDC, startX, i * cHeight, addrPart, 8);
 
-        // Drawing Hex Bytes (Clean White)
         SetTextColor(memDC, RGB(240, 240, 240));
         TextOutA(memDC, startX + 10 * cWidth, i * cHeight, hexPart1, 24);
         TextOutA(memDC, startX + 35 * cWidth, i * cHeight, hexPart2, 24);
 
-        // Drawing ASCII (Medium Gray)
         SetTextColor(memDC, RGB(150, 150, 150));
         TextOutA(memDC, startX + 60 * cWidth, i * cHeight, asciiPart, 18);
 

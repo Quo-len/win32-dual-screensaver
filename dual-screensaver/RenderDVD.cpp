@@ -12,15 +12,19 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
 
     HFONT hOldFont = (HFONT)SelectObject(memDC, hDvdFont);
 
+    TEXTMETRICA tm;
+    GetTextMetricsA(memDC, &tm);
+
     SIZE textSize;
     GetTextExtentPoint32A(memDC, logoText, (int)strlen(logoText), &textSize);
 
     int tw = textSize.cx;
-    int th = textSize.cy;
+
+    int visualHeight = tm.tmAscent - tm.tmInternalLeading;
 
     if (data->logoX == 0 && data->logoY == 0) {
         data->logoX = (float)(rand() % max(1, width - tw));
-        data->logoY = (float)(rand() % max(1, height - th));
+        data->logoY = (float)(rand() % max(1, height - visualHeight));
     }
 
     data->logoX += data->logoDX;
@@ -28,11 +32,23 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
 
     bool bounced = false;
 
-    if (data->logoX <= 0) { data->logoX = 0; data->logoDX *= -1; bounced = true; }
-    else if (data->logoX + tw >= width) { data->logoX = (float)(width - tw); data->logoDX *= -1; bounced = true; }
+    if (data->logoX <= 0) {
+        data->logoX = 0; data->logoDX = abs(data->logoDX); bounced = true;
+    }
+    else if (data->logoX + tw >= width) {
+        data->logoX = (float)(width - tw); data->logoDX = -abs(data->logoDX); bounced = true;
+    }
 
-    if (data->logoY <= 0) { data->logoY = 0; data->logoDY *= -1; bounced = true; }
-    else if (data->logoY + th >= height) { data->logoY = (float)(height - th); data->logoDY *= -1; bounced = true; }
+    if (data->logoY <= 0) {
+        data->logoY = 0;
+        data->logoDY = abs(data->logoDY);
+        bounced = true;
+    }
+    else if (data->logoY + visualHeight >= height) {
+        data->logoY = (float)(height - visualHeight);
+        data->logoDY = -abs(data->logoDY);
+        bounced = true;
+    }
 
     if (bounced) {
         data->logoColorIndex = (data->logoColorIndex + 1) % 6;
@@ -45,7 +61,8 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
 
     SetBkMode(memDC, TRANSPARENT);
     SetTextColor(memDC, colors[data->logoColorIndex]);
-    TextOutA(memDC, (int)data->logoX, (int)data->logoY, logoText, (int)strlen(logoText));
+
+    TextOutA(memDC, (int)data->logoX, (int)data->logoY - tm.tmInternalLeading, logoText, (int)strlen(logoText));
 
     SelectObject(memDC, hOldFont);
     DeleteObject(hDvdFont);
