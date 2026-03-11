@@ -6,6 +6,8 @@
 #include <time.h>
 #include <vector>
 #include <string>
+#include <random>
+#include <numeric>
 
 #define MAX_LOADSTRING 100
 
@@ -48,32 +50,23 @@ int g_RandomMode = 0;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
-static const int perm[512] = {
-	151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
-	190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
-	88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
-	77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
-	102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
-	135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
-	5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
-	223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
-	129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
-	251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
-	49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-	138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,
-	151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
-	190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
-	88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
-	77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
-	102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
-	135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
-	5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
-	223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
-	129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
-	251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
-	49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-	138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
-};
+void initPerlin(unsigned int seed, int* permArray) {
+	int p[256];
+	std::iota(p, p + 256, 0);
+
+	std::mt19937 gen(seed);
+	for (int i = 255; i > 0; i--) {
+		std::uniform_int_distribution<int> dist(0, i);
+		int swapIndex = dist(gen);
+		int temp = p[i];
+		p[i] = p[swapIndex];
+		p[swapIndex] = temp;
+	}
+
+	for (int i = 0; i < 512; i++) {
+		permArray[i] = p[i & 255];
+	}
+}
 
 float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 float lerp(float t, float a, float b) { return a + t * (b - a); }
@@ -82,7 +75,7 @@ float grad(int hash, float x, float y, float z) {
 	float u = h < 8 ? x : y, v = h < 4 ? y : h == 12 || h == 14 ? x : z;
 	return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 }
-float perlin(float x, float y, float z) {
+float perlin(float x, float y, float z, const int* perm) {
 	int X = (int)floor(x) & 255, Y = (int)floor(y) & 255, Z = (int)floor(z) & 255;
 	x -= floor(x); y -= floor(y); z -= floor(z);
 	float u = fade(x), v = fade(y), w = fade(z);
@@ -107,8 +100,8 @@ struct MazeCell {
 
 struct FlowParticle {
 	float x, y;
+	float prev_x, prev_y;
 	int life;
-	COLORREF color;
 };
 
 struct ScreenData {
@@ -170,6 +163,7 @@ struct ScreenData {
 
 	std::vector<FlowParticle> flowParticles;
 	float flowZOff = 0.0f;
+	int perm[512];
 };
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -355,6 +349,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				FIXED_PITCH | FF_MODERN, L"MS Gothic");
 
 			data->startTime = GetTickCount();
+
+			unsigned int monitorSeed = (unsigned int)GetTickCount() + (rand() % 10000);
+			initPerlin(monitorSeed, data->perm);
 		}
 		SetTimer(hWnd, 1, 33, NULL);
 		break;
@@ -1318,24 +1315,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			SelectObject(memDC, hOldFont);
 			DeleteObject(hClockFont);
 		}
-		else if (mode == 12) { // Perlin Noise Flow Field
-			int numParticles = 4000;
-			if (data->flowParticles.empty()) {
+		else if (mode == 12) { // Perlin Noise Flow Field - Vein Style
+			int numParticles = 12000;
+
+			if (data->cols != width || data->rows != height || data->pixels.size() != width * height) {
+				data->cols = width;
+				data->rows = height;
+				data->pixels.assign(width * height, 0);
+
 				data->flowParticles.resize(numParticles);
 				for (auto& p : data->flowParticles) {
 					p.x = (float)(rand() % width);
 					p.y = (float)(rand() % height);
-					p.life = rand() % 150 + 50;
-					p.color = RGB(rand() % 100 + 50, rand() % 150 + 100, 255);
+					p.prev_x = p.x;
+					p.prev_y = p.y;
+					p.life = rand() % 400 + 50;
 				}
 			}
 
-			float scl = 0.005f;
-			for (auto& p : data->flowParticles) {
-				float angle = perlin(p.x * scl, p.y * scl, data->flowZOff) * 3.14159f * 4.0f;
-				float vx = cos(angle) * 3.5f;
-				float vy = sin(angle) * 3.5f;
+			uint32_t* px = data->pixels.data();
+			int totalPixels = width * height;
+			for (int i = 0; i < totalPixels; i++) {
+				if (px[i]) {
+					uint32_t c = px[i];
+					uint32_t r = (c >> 16) & 0xFF;
+					uint32_t g = (c >> 8) & 0xFF;
+					uint32_t b = c & 0xFF;
+					if (r > 0) r--;
+					if (g > 0) g--;
+					if (b > 0) b--;
+					px[i] = (r << 16) | (g << 8) | b;
+				}
+			}
 
+			float scl = 0.002f; // Increased scale range creates deeper "valleys" in the noise field
+			for (auto& p : data->flowParticles) {
+				float angle = perlin(p.x * scl, p.y * scl, data->flowZOff, data->perm) * 3.14159f * 4.0f;
+				float vx = cos(angle) * 1.5f;
+				float vy = sin(angle) * 1.5f;
+
+				p.prev_x = p.x;
+				p.prev_y = p.y;
 				p.x += vx;
 				p.y += vy;
 				p.life--;
@@ -1343,17 +1363,56 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height || p.life <= 0) {
 					p.x = (float)(rand() % width);
 					p.y = (float)(rand() % height);
-					p.life = rand() % 150 + 50;
+					p.prev_x = p.x;
+					p.prev_y = p.y;
+					p.life = rand() % 400 + 50;
 				}
 
-				HPEN hPen = CreatePen(PS_SOLID, 2, p.color);
-				HPEN hOldPen = (HPEN)SelectObject(memDC, hPen);
-				MoveToEx(memDC, (int)(p.x - vx * 5.0f), (int)(p.y - vy * 5.0f), NULL);
-				LineTo(memDC, (int)p.x, (int)p.y);
-				SelectObject(memDC, hOldPen);
-				DeleteObject(hPen);
+				// Draw lines additively using DDA mapping
+				float dx = p.x - p.prev_x;
+				float dy = p.y - p.prev_y;
+				int steps = (int)(max(fabs(dx), fabs(dy))) + 1;
+				float xInc = dx / steps;
+				float yInc = dy / steps;
+				float cx = p.prev_x;
+				float cy = p.prev_y;
+
+				for (int i = 0; i <= steps; i++) {
+					int px_x = (int)cx;
+					int py_y = (int)cy;
+					if (px_x >= 0 && px_x < width && py_y >= 0 && py_y < height) {
+						// Additive brightness
+						uint32_t c = px[py_y * width + px_x];
+						uint32_t r = ((c >> 16) & 0xFF) + 35;
+						uint32_t g = ((c >> 8) & 0xFF) + 35;
+						uint32_t b = (c & 0xFF) + 40; // Extremely subtle electric blue/white tint
+						if (r > 255) r = 255;
+						if (g > 255) g = 255;
+						if (b > 255) b = 255;
+						px[py_y * width + px_x] = (r << 16) | (g << 8) | b;
+					}
+					cx += xInc;
+					cy += yInc;
+				}
 			}
-			data->flowZOff += 0.003f;
+			data->flowZOff += 0.0008f;
+
+			// Write the persistent buffer to the frame
+			BITMAPINFO bmi = { 0 };
+			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth = width;
+			bmi.bmiHeader.biHeight = -height; // Draw top-down
+			bmi.bmiHeader.biPlanes = 1;
+			bmi.bmiHeader.biBitCount = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+
+			StretchDIBits(
+				memDC,
+				0, 0, width, height,
+				0, 0, width, height,
+				data->pixels.data(), &bmi,
+				DIB_RGB_COLORS, SRCCOPY
+			);
 		}
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
