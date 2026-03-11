@@ -27,6 +27,7 @@
 #define IDC_EDIT_PONG_SPEED   1014
 #define IDC_EDIT_MAZE_BUILD_SPEED 1015
 #define IDC_EDIT_MAZE_SOLVE_SPEED 1016
+#define IDC_EDIT_PERLIN_SCALE 1017
 
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
@@ -42,6 +43,7 @@ float g_EarthSpeed = 0.05f;
 float g_PongSpeed = 15.0f;
 float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
+float g_PerlinScale = 0.002f;
 
 // 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field
 int g_ModePrimary = 11;
@@ -198,6 +200,8 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"MazeBuildSpeed", NULL, NULL, (LPBYTE)&g_MazeBuildSpeed, &size);
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"MazeSolveSpeed", NULL, NULL, (LPBYTE)&g_MazeSolveSpeed, &size);
+		size = sizeof(float);
+		RegQueryValueExW(hKey, L"PerlinScale", NULL, NULL, (LPBYTE)&g_PerlinScale, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"ModePrimary", NULL, NULL, (LPBYTE)&g_ModePrimary, &size);
 		size = sizeof(int);
@@ -223,6 +227,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"PongSpeed", 0, REG_DWORD, (const BYTE*)&g_PongSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"MazeBuildSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeBuildSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"MazeSolveSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeSolveSpeed, sizeof(float));
+		RegSetValueExW(hKey, L"PerlinScale", 0, REG_DWORD, (const BYTE*)&g_PerlinScale, sizeof(float));
 		RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
 		RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
 		RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
@@ -1348,9 +1353,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 			}
 
-			float scl = 0.002f; // Increased scale range creates deeper "valleys" in the noise field
 			for (auto& p : data->flowParticles) {
-				float angle = perlin(p.x * scl, p.y * scl, data->flowZOff, data->perm) * 3.14159f * 4.0f;
+				float angle = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm) * 3.14159f * 4.0f;
 				float vx = cos(angle) * 1.5f;
 				float vy = sin(angle) * 1.5f;
 
@@ -1368,7 +1372,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					p.life = rand() % 400 + 50;
 				}
 
-				// Draw lines additively using DDA mapping
 				float dx = p.x - p.prev_x;
 				float dy = p.y - p.prev_y;
 				int steps = (int)(max(fabs(dx), fabs(dy))) + 1;
@@ -1381,11 +1384,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					int px_x = (int)cx;
 					int py_y = (int)cy;
 					if (px_x >= 0 && px_x < width && py_y >= 0 && py_y < height) {
-						// Additive brightness
 						uint32_t c = px[py_y * width + px_x];
 						uint32_t r = ((c >> 16) & 0xFF) + 35;
 						uint32_t g = ((c >> 8) & 0xFF) + 35;
-						uint32_t b = (c & 0xFF) + 40; // Extremely subtle electric blue/white tint
+						uint32_t b = (c & 0xFF) + 40;
 						if (r > 255) r = 255;
 						if (g > 255) g = 255;
 						if (b > 255) b = 255;
@@ -1397,7 +1399,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			data->flowZOff += 0.0008f;
 
-			// Write the persistent buffer to the frame
 			BITMAPINFO bmi = { 0 };
 			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 			bmi.bmiHeader.biWidth = width;
@@ -1471,7 +1472,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 310, 680,
+		CW_USEDEFAULT, CW_USEDEFAULT, 310, 750,
 		nullptr, nullptr, hInstance, nullptr);
 
 	MSG msg;
@@ -1537,6 +1538,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND h12 = CreateWindowW(L"STATIC", L"Solve Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
 		HWND hMS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_MAZE_SOLVE_SPEED, hInst, NULL); y += 35;
 
+		HWND hL7 = CreateWindowW(L"STATIC", L"Perlin Noise Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
+		SendMessage(hL7, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+
+		HWND h13 = CreateWindowW(L"STATIC", L"Scale:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+		HWND hPerlinScale = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_PERLIN_SCALE, hInst, NULL); y += 35;
+
 		HWND hL3 = CreateWindowW(L"STATIC", L"Monitor Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
 		SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
 
@@ -1578,6 +1585,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		SendMessage(hMB, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(h12, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hMS, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+		SendMessage(h13, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+		SendMessage(hPerlinScale, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(h7, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hC1, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(h8, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
@@ -1598,6 +1607,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.1f", g_PongSpeed); SetWindowTextA(hPS, buf);
 		sprintf_s(buf, "%.1f", g_MazeBuildSpeed); SetWindowTextA(hMB, buf);
 		sprintf_s(buf, "%.1f", g_MazeSolveSpeed); SetWindowTextA(hMS, buf);
+		sprintf_s(buf, "%.4f", g_PerlinScale); SetWindowTextA(hPerlinScale, buf);
 		SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
 		SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
 
@@ -1619,6 +1629,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			GetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf, 32); g_PongSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf, 32); g_PerlinScale = (float)atof(buf);
 
 			g_ModePrimary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
 			g_ModeSecondary = SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
@@ -1646,6 +1657,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			sprintf_s(buf, "%.1f", 15.0f); SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
+			sprintf_s(buf, "%.4f", 0.002f); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
 
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 11, 0);
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
