@@ -1,4 +1,3 @@
-// new
 #include "framework.h"
 #include "dual-screensaver.h"
 #include "Settings.h"
@@ -28,12 +27,27 @@ float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
 float g_PerlinScale = 0.002f;
 
-// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field, 13=ASCII Fire
+
+// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field, ...
 int g_ModePrimary = 11;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
 
+
+
 const WCHAR* REG_PATH = L"Software\\DualSaver";
+
+
+using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
+static const RenderFn g_renderers[] = {
+	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
+	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
+	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
+	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort, 
+	RenderRandomSort
+};
+
+#define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -77,10 +91,6 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"ModeSecondary", NULL, NULL, (LPBYTE)&g_ModeSecondary, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
-
-		if (g_ModePrimary < 0 || g_ModePrimary > 16) g_ModePrimary = 11;
-		if (g_ModeSecondary < 0 || g_ModeSecondary > 16) g_ModeSecondary = 1;
-
 		RegCloseKey(hKey);
 	}
 }
@@ -121,8 +131,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	if (g_RandomMode) {
-		g_ModePrimary = rand() % 16;
-		g_ModeSecondary = rand() % 16;
+		g_ModePrimary = rand() % NUM_SCREENSAVERS;
+		g_ModeSecondary = rand() % NUM_SCREENSAVERS;
 	}
 
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -199,16 +209,6 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	return TRUE;
 }
 
-using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
-static const RenderFn g_renderers[] = {
-	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
-	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
-	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort, RenderRandomSort
-};
-
-
-
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static POINT initialMousePos;
@@ -267,8 +267,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
-		if (mode >= 0 && mode < (int)(sizeof(g_renderers) / sizeof(g_renderers[0])))
-			g_renderers[mode](memDC, data, width, height, rect);
+		if (mode >= 0 && mode < NUM_SCREENSAVERS)
+            g_renderers[mode](memDC, data, width, height, rect);
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -301,7 +301,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (data) {
 			if (data->hFont) DeleteObject(data->hFont);
 			if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
-			if (data->hHexFont) DeleteObject(data->hHexFont);
 			delete data;
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
 		}
@@ -327,7 +326,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 310, 750,
+		CW_USEDEFAULT, CW_USEDEFAULT, 750, 550,
 		nullptr, nullptr, hInstance, nullptr);
 
 	MSG msg;
@@ -344,89 +343,124 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	{
 	case WM_CREATE:
 	{
-		HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-		HFONT hBold = CreateFontW(14, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+		// --- BOLDER, BIGGER FONTS ---
+		HFONT hBold = CreateFontW(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
-		int y = 10;
-		HWND hL1 = CreateWindowW(L"STATIC", L"Donut Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL1, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HFONT hFont = CreateFontW(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
-		HWND h1 = CreateWindowW(L"STATIC", L"A Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hA = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_ASPEED, hInst, NULL); y += 30;
+		// --- SPACIOUS LAYOUT ---
+		const int col1X = 25;
+		const int col2X = 380;
+		const int lblW = 140;
+		const int edtW = 140;
+		const int rowH = 38;  // Increased height for bigger fonts
+		const int secH = 50;  // Spacing between sections
 
-		HWND h2 = CreateWindowW(L"STATIC", L"B Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hB = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_BSPEED, hInst, NULL); y += 30;
+		int y = 5;
 
-		HWND h3 = CreateWindowW(L"STATIC", L"Donut Size:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_SIZE, hInst, NULL); y += 30;
+		// --- COLUMN 1 ---
+		HWND hL1 = CreateWindowW(L"STATIC", L"Donut Settings", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL1, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND hDistLbl = CreateWindowW(L"STATIC", L"Distance:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hDist = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_DONUT_DISTANCE, hInst, NULL); y += 30;
+		HWND h1 = CreateWindowW(L"STATIC", L"A Speed:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hA = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_ASPEED, hInst, NULL); y += rowH;
 
-		HWND h4 = CreateWindowW(L"STATIC", L"Text Size:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hT = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_TEXTSIZE, hInst, NULL); y += 35;
+		HWND h2 = CreateWindowW(L"STATIC", L"B Speed:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hB = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_BSPEED, hInst, NULL); y += rowH;
 
-		HWND hL2 = CreateWindowW(L"STATIC", L"Game of Life Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL2, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND h3 = CreateWindowW(L"STATIC", L"Donut Size:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_SIZE, hInst, NULL); y += rowH;
 
-		HWND h5 = CreateWindowW(L"STATIC", L"Cell Size (px):", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hG1 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_GOL_SIZE, hInst, NULL); y += 30;
+		HWND hDistLbl = CreateWindowW(L"STATIC", L"Distance:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hDist = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_DONUT_DISTANCE, hInst, NULL); y += rowH;
 
-		HWND h6 = CreateWindowW(L"STATIC", L"Speed (ms):", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hG2 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_GOL_SPEED, hInst, NULL); y += 35;
+		HWND h4 = CreateWindowW(L"STATIC", L"Text Size:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hT = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_TEXTSIZE, hInst, NULL); y += secH;
 
-		HWND hL4 = CreateWindowW(L"STATIC", L"Earth Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL4, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND hL2 = CreateWindowW(L"STATIC", L"Game of Life", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL2, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND h9 = CreateWindowW(L"STATIC", L"Spin Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL); y += 35;
+		HWND h5 = CreateWindowW(L"STATIC", L"Cell (px):", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hG1 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_GOL_SIZE, hInst, NULL); y += rowH;
 
-		HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL5, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND h6 = CreateWindowW(L"STATIC", L"Speed (ms):", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hG2 = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_GOL_SPEED, hInst, NULL); y += secH;
 
-		HWND h10 = CreateWindowW(L"STATIC", L"Game Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hPS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_PONG_SPEED, hInst, NULL); y += 35;
+		HWND hL4 = CreateWindowW(L"STATIC", L"Earth Settings", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL4, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND hL6 = CreateWindowW(L"STATIC", L"Maze Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL6, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND h9 = CreateWindowW(L"STATIC", L"Spin:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL);
 
-		HWND h11 = CreateWindowW(L"STATIC", L"Build Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hMB = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_MAZE_BUILD_SPEED, hInst, NULL); y += 30;
+		// --- COLUMN 2 ---
+		y = 5;
 
-		HWND h12 = CreateWindowW(L"STATIC", L"Solve Speed:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hMS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_MAZE_SOLVE_SPEED, hInst, NULL); y += 35;
+		HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL5, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND hL7 = CreateWindowW(L"STATIC", L"Perlin Noise Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL7, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND h10 = CreateWindowW(L"STATIC", L"Speed:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hPS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PONG_SPEED, hInst, NULL); y += secH;
 
-		HWND h13 = CreateWindowW(L"STATIC", L"Scale:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hPerlinScale = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_PERLIN_SCALE, hInst, NULL); y += 35;
+		HWND hL6 = CreateWindowW(L"STATIC", L"Maze Settings", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL6, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND hL3 = CreateWindowW(L"STATIC", L"Monitor Settings", WS_CHILD | WS_VISIBLE, 10, y, 200, 20, hWnd, NULL, hInst, NULL);
-		SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 25;
+		HWND h11 = CreateWindowW(L"STATIC", L"Build Spd:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hMB = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_MAZE_BUILD_SPEED, hInst, NULL); y += rowH;
 
-		HWND h7 = CreateWindowW(L"STATIC", L"Primary:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hC1 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 130, y, 100, 100, hWnd, (HMENU)IDC_COMBO_PRIMARY, hInst, NULL); y += 30;
+		HWND h12 = CreateWindowW(L"STATIC", L"Solve Spd:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hMS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_MAZE_SOLVE_SPEED, hInst, NULL); y += secH;
 
-		HWND h8 = CreateWindowW(L"STATIC", L"Secondary:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
-		HWND hC2 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 130, y, 100, 100, hWnd, (HMENU)IDC_COMBO_SECONDARY, hInst, NULL); y += 35;
+		HWND hL7 = CreateWindowW(L"STATIC", L"Perlin Noise", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL7, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 20, y, 250, 20, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL); y += 35;
+		HWND h13 = CreateWindowW(L"STATIC", L"Scale:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hPerlinScale = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PERLIN_SCALE, hInst, NULL); y += secH;
 
-		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 30, y, 70, 25, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
-		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
-		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
+		HWND hL3 = CreateWindowW(L"STATIC", L"Monitors", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
-		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort", L"Sorting Algorithms" };
-		for (int i = 0; i < 17; i++) {
+		HWND h7 = CreateWindowW(L"STATIC", L"Primary:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hC1 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, col2X + 150, y, edtW, 300, hWnd, (HMENU)IDC_COMBO_PRIMARY, hInst, NULL); y += rowH;
+
+		HWND h8 = CreateWindowW(L"STATIC", L"Secondary:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hC2 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, col2X + 150, y, edtW, 300, hWnd, (HMENU)IDC_COMBO_SECONDARY, hInst, NULL);
+
+		// --- FOOTER ---
+		y = 460;
+		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, col1X, y, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
+
+		int btnW = 100;
+		int btnH = 35;
+		int rightBtnX = 400; // Buttons shifted to the right
+
+		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+			rightBtnX, y, btnW, btnH, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
+
+		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			rightBtnX + 110, y, btnW, btnH, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
+
+		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
+
+		// --- APPLY FONT ---
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
+		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		// Fill Comboboxes
+		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
+								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
+								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
+								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort",
+								   L"Sorting Algorithms" 
+								 };
+		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
-		for (HWND hw : controls)
-			SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
-
+		// Set Initial Values
 		char buf[32];
 		sprintf_s(buf, "%.3f", g_ASpeed);        SetWindowTextA(hA, buf);
 		sprintf_s(buf, "%.3f", g_BSpeed);        SetWindowTextA(hB, buf);
@@ -442,7 +476,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.4f", g_PerlinScale);   SetWindowTextA(hPerlinScale, buf);
 		SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
 		SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
-		SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, g_RandomMode ? BST_CHECKED : BST_UNCHECKED, 0);
+		SendMessage(hRand, BM_SETCHECK, g_RandomMode ? BST_CHECKED : BST_UNCHECKED, 0);
 		break;
 	}
 	case WM_COMMAND:
