@@ -135,11 +135,29 @@
   <ItemGroup>
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="Perlin.h" />
+    <ClInclude Include="Renderers.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="ScreenData.h" />
+    <ClInclude Include="Settings.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dual-screensaver.cpp" />
+    <ClCompile Include="Perlin.cpp" />
+    <ClCompile Include="RenderBlank.cpp" />
+    <ClCompile Include="RenderClock.cpp" />
+    <ClCompile Include="RenderDonut.cpp" />
+    <ClCompile Include="RenderDVD.cpp" />
+    <ClCompile Include="RenderEarth.cpp" />
+    <ClCompile Include="RenderGoL.cpp" />
+    <ClCompile Include="RenderGrid.cpp" />
+    <ClCompile Include="RenderJulia.cpp" />
+    <ClCompile Include="RenderMatrix.cpp" />
+    <ClCompile Include="RenderMaze.cpp" />
+    <ClCompile Include="RenderPerlin.cpp" />
+    <ClCompile Include="RenderPong.cpp" />
+    <ClCompile Include="RenderStars.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="dual-screensaver.rc" />
