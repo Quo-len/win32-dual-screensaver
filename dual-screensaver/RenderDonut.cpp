@@ -18,8 +18,8 @@ void RenderDonut(HDC memDC, ScreenData* data, int width, int height, const RECT&
     std::vector<float> z(W * H, 0.0f);
     std::vector<char> b(W * H, ' ');
 
-    float K2 = g_DonutSize + 3.0f;
-    float proj_scale = K2 / (g_DonutSize + 1.0f);
+    float K2 = g_DonutSize + g_DonutDistance;
+    float proj_scale = (g_DonutSize + 3.0f) / (g_DonutSize + 1.0f);
     float x_mult = W * 0.225f * proj_scale;
     float y_mult = H * 0.409f * proj_scale;
 

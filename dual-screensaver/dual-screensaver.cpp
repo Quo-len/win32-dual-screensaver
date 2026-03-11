@@ -17,6 +17,7 @@ WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
 float g_ASpeed = 0.04f;
 float g_BSpeed = 0.02f;
 float g_DonutSize = 2.0f;
+float g_DonutDistance = 3.0f;
 int g_TextSize = 20;
 int g_GolCellSize = 2;
 int g_GolSpeed = 33;
@@ -52,6 +53,8 @@ void LoadSettings()
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"DonutSize", NULL, NULL, (LPBYTE)&g_DonutSize, &size);
 		size = sizeof(int);
+		RegQueryValueExW(hKey, L"DonutDistance", NULL, NULL, (LPBYTE)&g_DonutDistance, &size);
+		size = sizeof(int);
 		RegQueryValueExW(hKey, L"TextSize", NULL, NULL, (LPBYTE)&g_TextSize, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"GolCellSize", NULL, NULL, (LPBYTE)&g_GolCellSize, &size);
@@ -73,6 +76,10 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"ModeSecondary", NULL, NULL, (LPBYTE)&g_ModeSecondary, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
+
+		if (g_ModePrimary < 0 || g_ModePrimary > 12) g_ModePrimary = 11;
+		if (g_ModeSecondary < 0 || g_ModeSecondary > 12) g_ModeSecondary = 1;
+
 		RegCloseKey(hKey);
 	}
 }
@@ -85,6 +92,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"ASpeed", 0, REG_DWORD, (const BYTE*)&g_ASpeed, sizeof(float));
 		RegSetValueExW(hKey, L"BSpeed", 0, REG_DWORD, (const BYTE*)&g_BSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"DonutSize", 0, REG_DWORD, (const BYTE*)&g_DonutSize, sizeof(float));
+		RegSetValueExW(hKey, L"DonutDistance", 0, REG_DWORD, (const BYTE*)&g_DonutDistance, sizeof(float));
 		RegSetValueExW(hKey, L"TextSize", 0, REG_DWORD, (const BYTE*)&g_TextSize, sizeof(int));
 		RegSetValueExW(hKey, L"GolCellSize", 0, REG_DWORD, (const BYTE*)&g_GolCellSize, sizeof(int));
 		RegSetValueExW(hKey, L"GolSpeed", 0, REG_DWORD, (const BYTE*)&g_GolSpeed, sizeof(int));
@@ -197,6 +205,8 @@ static const RenderFn g_renderers[] = {
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
 	RenderPerlin
 };
+
+
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -315,7 +325,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 310, 750,
+		CW_USEDEFAULT, CW_USEDEFAULT, 310, 850,
 		nullptr, nullptr, hInstance, nullptr);
 
 	MSG msg;
@@ -347,6 +357,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		HWND h3 = CreateWindowW(L"STATIC", L"Donut Size:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
 		HWND hS = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_SIZE, hInst, NULL); y += 30;
+
+		HWND hDistLbl = CreateWindowW(L"STATIC", L"Distance:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
+		HWND hDist = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_DONUT_DISTANCE, hInst, NULL); y += 30;
 
 		HWND h4 = CreateWindowW(L"STATIC", L"Text Size:", WS_CHILD | WS_VISIBLE, 20, y, 100, 20, hWnd, NULL, hInst, NULL);
 		HWND hT = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 130, y, 100, 20, hWnd, (HMENU)IDC_EDIT_TEXTSIZE, hInst, NULL); y += 35;
@@ -398,9 +411,9 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 20, y, 250, 20, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL); y += 35;
 
-		HWND hOk     = CreateWindowW(L"BUTTON", L"OK",     WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 30,  y, 70, 25, hWnd, (HMENU)IDOK_BTN,     hInst, NULL);
-		HWND hReset  = CreateWindowW(L"BUTTON", L"Reset",  WS_CHILD | WS_VISIBLE | WS_TABSTOP,                   110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN,  hInst, NULL);
-		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,                   190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
+		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 30, y, 70, 25, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
+		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
+		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field" };
 		for (int i = 0; i < 13; i++) {
@@ -408,7 +421,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
 		for (HWND hw : controls)
 			SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
@@ -416,9 +429,10 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.3f", g_ASpeed);        SetWindowTextA(hA, buf);
 		sprintf_s(buf, "%.3f", g_BSpeed);        SetWindowTextA(hB, buf);
 		sprintf_s(buf, "%.1f", g_DonutSize);     SetWindowTextA(hS, buf);
-		sprintf_s(buf, "%d",   g_TextSize);      SetWindowTextA(hT, buf);
-		sprintf_s(buf, "%d",   g_GolCellSize);   SetWindowTextA(hG1, buf);
-		sprintf_s(buf, "%d",   g_GolSpeed);      SetWindowTextA(hG2, buf);
+		sprintf_s(buf, "%.1f", g_DonutDistance); SetWindowTextA(hDist, buf);
+		sprintf_s(buf, "%d", g_TextSize);      SetWindowTextA(hT, buf);
+		sprintf_s(buf, "%d", g_GolCellSize);   SetWindowTextA(hG1, buf);
+		sprintf_s(buf, "%d", g_GolSpeed);      SetWindowTextA(hG2, buf);
 		sprintf_s(buf, "%.3f", g_EarthSpeed);    SetWindowTextA(hES, buf);
 		sprintf_s(buf, "%.1f", g_PongSpeed);     SetWindowTextA(hPS, buf);
 		sprintf_s(buf, "%.1f", g_MazeBuildSpeed);SetWindowTextA(hMB, buf);
@@ -433,21 +447,22 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		if (LOWORD(wParam) == IDOK_BTN)
 		{
 			char buf[32];
-			GetDlgItemTextA(hWnd, IDC_EDIT_ASPEED,           buf, 32); g_ASpeed        = (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_BSPEED,           buf, 32); g_BSpeed        = (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_SIZE,             buf, 32); g_DonutSize     = (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE,         buf, 32); g_TextSize      = atoi(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE,         buf, 32); g_GolCellSize   = atoi(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED,        buf, 32); g_GolSpeed      = atoi(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED,      buf, 32); g_EarthSpeed    = (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED,       buf, 32); g_PongSpeed     = (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed= (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed= (float)atof(buf);
-			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE,     buf, 32); g_PerlinScale   = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf, 32); g_ASpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf, 32); g_BSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf, 32); g_DonutSize = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf, 32); g_DonutDistance = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf, 32); g_TextSize = atoi(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf, 32); g_GolCellSize = atoi(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf, 32); g_GolSpeed = atoi(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf, 32); g_EarthSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf, 32); g_PongSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf, 32); g_PerlinScale = (float)atof(buf);
 
-			g_ModePrimary   = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY),   CB_GETCURSEL, 0, 0);
+			g_ModePrimary = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
 			g_ModeSecondary = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
-			g_RandomMode    = SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_GETCHECK, 0, 0) == BST_CHECKED ? 1 : 0;
+			g_RandomMode = SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_GETCHECK, 0, 0) == BST_CHECKED ? 1 : 0;
 
 			if (g_GolCellSize < 1)    g_GolCellSize = 1;
 			if (g_GolSpeed < 10)      g_GolSpeed = 10;
@@ -463,17 +478,18 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			sprintf_s(buf, "%.3f", 0.04f);  SetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf);
 			sprintf_s(buf, "%.3f", 0.02f);  SetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf);
 			sprintf_s(buf, "%.1f", 2.0f);   SetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf);
-			sprintf_s(buf, "%d",   20);      SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
-			sprintf_s(buf, "%d",   2);       SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
-			sprintf_s(buf, "%d",   33);      SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
+			sprintf_s(buf, "%.1f", 3.0f);   SetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf);
+			sprintf_s(buf, "%d", 20);      SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
+			sprintf_s(buf, "%d", 2);       SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
+			sprintf_s(buf, "%d", 33);      SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
 			sprintf_s(buf, "%.3f", 0.05f);  SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
 			sprintf_s(buf, "%.1f", 15.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
 			sprintf_s(buf, "%.1f", 10.0f);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 			sprintf_s(buf, "%.4f", 0.002f); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
-			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY),   CB_SETCURSEL, 11,          0);
-			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1,           0);
-			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM),    BM_SETCHECK,  BST_UNCHECKED, 0);
+			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, 11, 0);
+			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, 1, 0);
+			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, BST_UNCHECKED, 0);
 		}
 		else if (LOWORD(wParam) == IDCANCEL_BTN)
 		{
