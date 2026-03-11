@@ -15,3 +15,4 @@ void RenderPong(HDC memDC, ScreenData* data, int width, int height, const RECT& 
 void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderClock(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderFire(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

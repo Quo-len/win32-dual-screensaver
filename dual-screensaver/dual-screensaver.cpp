@@ -1,3 +1,4 @@
+// new
 #include "framework.h"
 #include "dual-screensaver.h"
 #include "Settings.h"
@@ -27,7 +28,7 @@ float g_MazeBuildSpeed = 10.0f;
 float g_MazeSolveSpeed = 10.0f;
 float g_PerlinScale = 0.002f;
 
-// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field
+// 0=Donut, 1=GoL, 2=Matrix, 3=Earth, 4=Blank, 5=Julia, 6=Stars, 7=DVD, 8=Grid, 9=Pong, 10=Maze, 11=Clock, 12=Perlin Flow Field, 13=ASCII Fire
 int g_ModePrimary = 11;
 int g_ModeSecondary = 1;
 int g_RandomMode = 0;
@@ -77,8 +78,8 @@ void LoadSettings()
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
 
-		if (g_ModePrimary < 0 || g_ModePrimary > 12) g_ModePrimary = 11;
-		if (g_ModeSecondary < 0 || g_ModeSecondary > 12) g_ModeSecondary = 1;
+		if (g_ModePrimary < 0 || g_ModePrimary > 13) g_ModePrimary = 11;
+		if (g_ModeSecondary < 0 || g_ModeSecondary > 13) g_ModeSecondary = 1;
 
 		RegCloseKey(hKey);
 	}
@@ -120,8 +121,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	if (g_RandomMode) {
-		g_ModePrimary = rand() % 13;
-		g_ModeSecondary = rand() % 13;
+		g_ModePrimary = rand() % 14;
+		g_ModeSecondary = rand() % 14;
 	}
 
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -203,7 +204,7 @@ static const RenderFn g_renderers[] = {
 	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin
+	RenderPerlin, RenderFire
 };
 
 
@@ -325,7 +326,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 310, 850,
+		CW_USEDEFAULT, CW_USEDEFAULT, 310, 750,
 		nullptr, nullptr, hInstance, nullptr);
 
 	MSG msg;
@@ -415,8 +416,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hReset = CreateWindowW(L"BUTTON", L"Reset", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 110, y, 70, 25, hWnd, (HMENU)IDRESET_BTN, hInst, NULL);
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 190, y, 70, 25, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field" };
-		for (int i = 0; i < 13; i++) {
+		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth", L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo", L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock", L"Perlin Flow Field", L"ASCII Fire" };
+		for (int i = 0; i < 14; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
 		}

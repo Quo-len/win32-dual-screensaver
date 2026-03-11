@@ -59,6 +59,9 @@
     <ClCompile Include="RenderEarth.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RenderFire.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="RenderBlank.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

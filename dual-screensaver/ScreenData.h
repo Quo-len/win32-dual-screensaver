@@ -76,4 +76,8 @@ struct ScreenData {
     std::vector<FlowParticle> flowParticles;
     float flowZOff = 0.0f;
     int perm[512];
+
+    std::vector<int> fireGrid;
+    int fireWidth = 0;
+    int fireHeight = 0;
 };

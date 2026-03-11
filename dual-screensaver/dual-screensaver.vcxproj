@@ -150,6 +150,7 @@
     <ClCompile Include="RenderDonut.cpp" />
     <ClCompile Include="RenderDVD.cpp" />
     <ClCompile Include="RenderEarth.cpp" />
+    <ClCompile Include="RenderFire.cpp" />
     <ClCompile Include="RenderGoL.cpp" />
     <ClCompile Include="RenderGrid.cpp" />
     <ClCompile Include="RenderJulia.cpp" />
