@@ -5,12 +5,15 @@
 #include <math.h>
 
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    int numParticles = 6000;
+    if (width <= 0 || height <= 0) return;
 
-    if (data->cols != width || data->rows != height || (int)data->pixels.size() != width * height) {
+    if (data->cols != width || data->rows != height || data->pixels.empty()) {
         data->cols = width;
         data->rows = height;
-        data->pixels.assign(width * height, 0);
+        data->pixels.assign(width * height, 0xFF000000);
+
+        int numParticles = (width * height) / 500;
+        if (numParticles > 8000) numParticles = 8000;
 
         data->flowParticles.resize(numParticles);
         for (auto& p : data->flowParticles) {
@@ -18,23 +21,57 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
             p.y = (float)(rand() % height);
             p.prev_x = p.x;
             p.prev_y = p.y;
-            p.life = rand() % 400 + 50;
+            p.life = rand() % 200 + 50;
         }
     }
 
     uint32_t* px = data->pixels.data();
-    std::vector<int> faded;
-    faded.reserve(numParticles * 2);
+    int totalPixels = width * height;
+
+    const int fadeSpeed = 6;
+
+    for (int i = 0; i < totalPixels; i++) {
+        uint32_t c = px[i];
+
+        int r = (c >> 16) & 0xFF;
+        int g = (c >> 8) & 0xFF;
+        int b = c & 0xFF;
+
+        r = (r > fadeSpeed) ? r - fadeSpeed : 0;
+        g = (g > fadeSpeed) ? g - fadeSpeed : 0;
+        b = (b > fadeSpeed) ? b - fadeSpeed : 0;
+
+        px[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    data->flowZOff += 0.003f;
+    const float PI = 3.14159265358979323846f;
 
     for (auto& p : data->flowParticles) {
-        float angle = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm) * 3.14159f * 4.0f;
-        float vx = cos(angle) * 1.5f;
-        float vy = sin(angle) * 1.5f;
+        float noiseVal = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm);
+        float angle = noiseVal * PI * 4.0f;
 
-        p.prev_x = p.x;
-        p.prev_y = p.y;
-        p.x += vx;
-        p.y += vy;
+        float vx = cos(angle);
+        float vy = sin(angle);
+
+        p.x += vx * 2.5f;
+        p.y += vy * 2.5f;
+
+        int ix = (int)p.x;
+        int iy = (int)p.y;
+
+        if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+
+            int r = (int)((cos(angle) + 1.0f) * 55.0f) + 130;
+            int g = (int)((sin(angle) + 1.0f) * 20.0f) + 10;
+            int b = 250;
+
+            if (r > 255) r = 255;
+            if (g > 255) g = 255;
+
+            data->pixels[iy * width + ix] = 0xFF000000 | (r << 16) | (g << 8) | b;
+        }
+
         p.life--;
 
         if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height || p.life <= 0) {
@@ -42,48 +79,13 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
             p.y = (float)(rand() % height);
             p.prev_x = p.x;
             p.prev_y = p.y;
-            p.life = rand() % 400 + 50;
+            p.life = rand() % 200 + 50;
         }
-
-        float dx = p.x - p.prev_x;
-        float dy = p.y - p.prev_y;
-        int steps = (int)(max(fabs(dx), fabs(dy))) + 1;
-        float xInc = dx / steps;
-        float yInc = dy / steps;
-        float cx = p.prev_x;
-        float cy = p.prev_y;
-
-        for (int i = 0; i <= steps; i++) {
-            int px_x = (int)cx;
-            int py_y = (int)cy;
-            if (px_x >= 0 && px_x < width && py_y >= 0 && py_y < height) {
-                int idx = py_y * width + px_x;
-                uint32_t c = px[idx];
-                uint32_t r = ((c >> 16) & 0xFF) + 35;
-                uint32_t g = ((c >> 8) & 0xFF) + 35;
-                uint32_t b = (c & 0xFF) + 40;
-                if (r > 255) r = 255;
-                if (g > 255) g = 255;
-                if (b > 255) b = 255;
-                px[idx] = (r << 16) | (g << 8) | b;
-                faded.push_back(idx);
-            }
-            cx += xInc;
-            cy += yInc;
+        else {
+            p.prev_x = p.x;
+            p.prev_y = p.y;
         }
     }
-
-    for (int idx : faded) {
-        uint32_t c = px[idx];
-        uint32_t r = (c >> 16) & 0xFF;
-        uint32_t g = (c >> 8) & 0xFF;
-        uint32_t b = c & 0xFF;
-        if (r > 0) r--;
-        if (g > 0) g--;
-        if (b > 0) b--;
-        px[idx] = (r << 16) | (g << 8) | b;
-    }
-    data->flowZOff += 0.0008f;
 
     BITMAPINFO bmi = { 0 };
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -93,6 +95,6 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    StretchDIBits(memDC, 0, 0, width, height, 0, 0, width, height,
-        data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
+    StretchDIBits(memDC, 0, 0, width, height,
+        0, 0, width, height, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }

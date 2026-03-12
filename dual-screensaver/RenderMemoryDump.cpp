@@ -3,7 +3,9 @@
 #include "Settings.h"
 
 void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    if (data->hexLastWidth != width || data->hHexFont == NULL) {
+    static int lastHeight = -1;
+
+    if (data->hexLastWidth != width || lastHeight != height || data->hHexFont == NULL) {
         if (data->hHexFont) DeleteObject(data->hHexFont);
 
         int fontHeight = (width / 78) * 2;
@@ -14,6 +16,7 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
             FIXED_PITCH | FF_MODERN, "Consolas");
 
         data->hexLastWidth = width;
+        lastHeight = height;
     }
 
     SelectObject(memDC, data->hHexFont);
@@ -38,7 +41,7 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
     uint32_t seed = (uint32_t)(data->hexBaseAddress ^ (data->hexBaseAddress >> 32));
     uint64_t currentAddr = data->hexBaseAddress;
 
-    for (int i = 0; i < lines + 1; i++) {
+    for (int i = 0; i < lines; i++) {
         char addrPart[16];
         sprintf_s(addrPart, "%08llx", currentAddr & 0xFFFFFFFF);
 
@@ -64,15 +67,20 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
         asciiPart[17] = '|';
         asciiPart[18] = '\0';
 
+        int yPos = 0;
+        if (lines > 1) {
+            yPos = i * (height - cHeight) / (lines - 1);
+        }
+
         SetTextColor(memDC, RGB(150, 150, 150));
-        TextOutA(memDC, startX, i * cHeight, addrPart, 8);
+        TextOutA(memDC, startX, yPos, addrPart, 8);
 
         SetTextColor(memDC, RGB(240, 240, 240));
-        TextOutA(memDC, startX + 10 * cWidth, i * cHeight, hexPart1, 24);
-        TextOutA(memDC, startX + 35 * cWidth, i * cHeight, hexPart2, 24);
+        TextOutA(memDC, startX + 10 * cWidth, yPos, hexPart1, 24);
+        TextOutA(memDC, startX + 35 * cWidth, yPos, hexPart2, 24);
 
         SetTextColor(memDC, RGB(150, 150, 150));
-        TextOutA(memDC, startX + 60 * cWidth, i * cHeight, asciiPart, 18);
+        TextOutA(memDC, startX + 60 * cWidth, yPos, asciiPart, 18);
 
         currentAddr += 16;
     }
