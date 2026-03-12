@@ -18,9 +18,14 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
         data->bogoAttempts = 0;
         data->bogoComparisons = 0;
         data->sortSweepIdx = 0;
+        data->sortRed1 = -1;
+        data->sortRed2 = -1;
     }
 
     if (data->sortState == 1) {
+        data->sortRed1 = -1;
+        data->sortRed2 = -1;
+
         bool sorted = true;
         for (size_t i = 1; i < data->bogoArray.size(); i++) {
             data->bogoComparisons++;
@@ -35,6 +40,9 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
             data->sortSweepIdx = 0;
         }
         else {
+            data->sortRed1 = rand() % numItems;
+            data->sortRed2 = rand() % numItems;
+
             for (int i = numItems - 1; i > 0; i--) {
                 int j = rand() % (i + 1);
                 std::swap(data->bogoArray[i], data->bogoArray[j]);
@@ -43,6 +51,8 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
         }
     }
     else if (data->sortState == 2) {
+        data->sortRed1 = -1;
+        data->sortRed2 = -1;
         data->sortSweepIdx += 1;
         if (data->sortSweepIdx >= numItems) {
             data->sortState = 3;
@@ -62,20 +72,29 @@ void RenderBogoSort(HDC memDC, ScreenData* data, int width, int height, const RE
 
     HBRUSH defaultBrush = CreateSolidBrush(RGB(200, 200, 200));
     HBRUSH greenBrush = CreateSolidBrush(RGB(50, 220, 50));
+    HBRUSH redBrush = CreateSolidBrush(RGB(255, 50, 50));
 
     for (int i = 0; i < numItems; i++) {
         HBRUSH brush = defaultBrush;
 
-        if (data->sortState == 2 && i <= data->sortSweepIdx) brush = greenBrush;
-        else if (data->sortState == 3) brush = greenBrush;
+        if (data->sortState == 1 && (i == data->sortRed1 || i == data->sortRed2)) {
+            brush = redBrush;
+        }
+        else if (data->sortState == 2 && i <= data->sortSweepIdx) {
+            brush = greenBrush;
+        }
+        else if (data->sortState == 3) {
+            brush = greenBrush;
+        }
 
         int barH = (data->bogoArray[i] * maxBarHeight) / numItems;
-        RECT r = { startX + i * barWidth, height - barH, startX + i * barWidth + barWidth - (barWidth > 2 ? 1 : 0), height  };
+        RECT r = { startX + i * barWidth, height - barH, startX + i * barWidth + barWidth - (barWidth > 2 ? 1 : 0), height };
         FillRect(memDC, &r, brush);
     }
 
     DeleteObject(defaultBrush);
     DeleteObject(greenBrush);
+    DeleteObject(redBrush);
 
     SelectObject(memDC, data->hFont);
     SetBkMode(memDC, TRANSPARENT);
