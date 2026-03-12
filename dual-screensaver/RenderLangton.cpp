@@ -14,15 +14,19 @@ void RenderLangton(HDC memDC, ScreenData* data, int width, int height, const REC
         data->antCols = cols;
         data->antRows = rows;
         data->antGrid.assign(cols * rows, 0);
-        data->pixels.assign(cols * rows, 0xFF000000);
+        data->pixels.assign(cols * rows, 0xFF000000); // Black Background
         data->ants.clear();
 
-        int symType = rand() % 3;
+        unsigned char r = (rand() % 156) + 100;
+        unsigned char g = (rand() % 156) + 100;
+        unsigned char b = (rand() % 156) + 100;
 
+        data->currentAntColor = 0xFF000000 | (r << 16) | (g << 8) | b;
+
+        int symType = rand() % 3;
         for (int i = 0; i < g_AntCount; i++) {
             int cx = cols / 2;
             int cy = rows / 2;
-
             int rx = rand() % (cx / 4);
             int ry = rand() % (cy / 4);
             int rdir = rand() % 4;
@@ -33,13 +37,10 @@ void RenderLangton(HDC memDC, ScreenData* data, int width, int height, const REC
             }
             else if (symType == 1) {
                 data->ants.push_back({ cx + rx, cy + ry, rdir });
-
                 int dirX = (rdir == 1) ? 3 : ((rdir == 3) ? 1 : rdir);
                 data->ants.push_back({ cx - rx, cy + ry, dirX });
-
                 int dirY = (rdir == 0) ? 2 : ((rdir == 2) ? 0 : rdir);
                 data->ants.push_back({ cx + rx, cy - ry, dirY });
-
                 int dirXY = (dirX == 0) ? 2 : ((dirX == 2) ? 0 : dirX);
                 data->ants.push_back({ cx - rx, cy - ry, dirXY });
             }
@@ -65,7 +66,7 @@ void RenderLangton(HDC memDC, ScreenData* data, int width, int height, const REC
             if (state == 0) {
                 ant.dir = (ant.dir + 1) % 4;
                 data->antGrid[idx] = 1;
-                data->pixels[idx] = 0xFFFFFFFF;
+                data->pixels[idx] = data->currentAntColor;
             }
             else {
                 ant.dir = (ant.dir + 3) % 4;

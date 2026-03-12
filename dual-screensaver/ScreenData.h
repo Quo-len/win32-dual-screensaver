@@ -120,4 +120,5 @@ struct ScreenData {
     std::vector<unsigned char> antGrid;
     int antCols = 0;
     int antRows = 0;
+    unsigned int currentAntColor;
 };
