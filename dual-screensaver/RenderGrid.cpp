@@ -45,10 +45,10 @@ void RenderGrid(HDC memDC, ScreenData* data, int width, int height, const RECT& 
         data->activeRow = rand() % targetRows;
         data->activeCol = rand() % targetCols;
         data->isRowActive = true;
-        data->lastHexUpdate = GetTickCount();
+        data->lastHexUpdate = GetTickCount64();
     }
 
-    DWORD now = GetTickCount();
+    DWORD now = GetTickCount64();
     if (now - data->lastHexUpdate > 800) {
         if (data->isRowActive) {
             data->activeCol = rand() % data->hexCols;

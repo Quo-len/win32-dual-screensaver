@@ -26,7 +26,7 @@ void RenderGoL(HDC memDC, ScreenData* data, int width, int height, const RECT& r
         }
     }
 
-    DWORD now = GetTickCount();
+    DWORD now = GetTickCount64();
     if (now - data->lastGolUpdate >= (DWORD)g_GolSpeed) {
         unsigned char* grid = data->grid.data();
         unsigned char* next = data->nextGrid.data();

@@ -29,11 +29,11 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
 
         data->mazeStack.push_back(data->mazeStart);
         data->mazeGrid[data->mazeStart].visited = true;
-        data->lastMazeUpdate = GetTickCount();
+        data->lastMazeUpdate = GetTickCount64();
         data->mazeWaitTimer = 0;
     }
 
-    DWORD now = GetTickCount();
+    DWORD now = GetTickCount64();
     int stepsPerFrame = max(1, (int)(data->mazeState == 1 ? g_MazeBuildSpeed : g_MazeSolveSpeed));
 
     if (now - data->lastMazeUpdate > 16) {

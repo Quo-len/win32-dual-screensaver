@@ -124,6 +124,44 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	srand((unsigned int)time(NULL));
 	LoadSettings();
 
+	// Map string names to mode indices
+	const struct { const wchar_t* name; int idx; } modeMap[] = {
+		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
+		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
+		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
+		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"bogo", 15},
+		{L"sort", 16}
+	};
+
+	// Robustly parse for two screensaver names (ignore /s, /p, /c, etc.)
+	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
+	WCHAR* context = NULL;
+	WCHAR* token = wcstok_s(cmdCopy, L" \t", &context);
+	WCHAR* foundArgs[2] = {NULL, NULL};
+	int foundCount = 0;
+	while (token && foundCount < 2) {
+		if (token[0] != L'/' && token[0] != L'-') {
+			foundArgs[foundCount++] = token;
+		}
+		token = wcstok_s(NULL, L" \t", &context);
+	}
+	if (foundCount == 1 || foundCount == 2) {
+		int found1 = -1, found2 = -1;
+		for (int i = 0; i < (int)(sizeof(modeMap)/sizeof(modeMap[0])); ++i) {
+			if (foundArgs[0] && _wcsicmp(foundArgs[0], modeMap[i].name) == 0) found1 = modeMap[i].idx;
+			if (foundCount == 2 && foundArgs[1] && _wcsicmp(foundArgs[1], modeMap[i].name) == 0) found2 = modeMap[i].idx;
+		}
+		if (found1 >= 0 && foundCount == 1) {
+			g_ModePrimary = found1;
+			g_RandomMode = 0;
+		} else if (found1 >= 0 && found2 >= 0 && foundCount == 2) {
+			g_ModePrimary = found1;
+			g_ModeSecondary = found2;
+			g_RandomMode = 0;
+		}
+	}
+	free(cmdCopy);
+
 	if (wcsstr(lpCmdLine, L"/c") || wcsstr(lpCmdLine, L"/C"))
 	{
 		ShowSettingsWindow(hInstance);
