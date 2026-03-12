@@ -16,6 +16,11 @@ struct FlowParticle {
     int life;
 };
 
+struct AntState {
+    int x, y;
+    int dir;
+};
+
 struct ScreenData {
     bool isPrimary;
     bool isPreview;
@@ -110,4 +115,9 @@ struct ScreenData {
     int sortExp = 1;
     long long sortComparisons = 0;
     long long sortSwaps = 0;
+
+    std::vector<AntState> ants;
+    std::vector<unsigned char> antGrid;
+    int antCols = 0;
+    int antRows = 0;
 };

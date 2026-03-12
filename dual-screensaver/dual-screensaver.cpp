@@ -28,6 +28,8 @@ float g_DvdSpeed = DEFAULT_DVDSPEED;
 float g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED;
 float g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED;
 float g_PerlinScale = DEFAULT_PERLINSCALE;
+int g_AntCount = DEFAULT_ANT_COUNT;
+int g_AntSpeed = DEFAULT_ANT_SPEED;
 
 int g_ModePrimary = DEFAULT_MODEPRIMARY;
 int g_ModeSecondary = DEFAULT_MODESECONDARY;
@@ -41,7 +43,7 @@ static const RenderFn g_renderers[] = {
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
 	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort,
-	RenderRandomSort
+	RenderRandomSort, RenderLangton
 };
 
 #define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
@@ -90,6 +92,10 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"ModeSecondary", NULL, NULL, (LPBYTE)&g_ModeSecondary, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
+		size = sizeof(int);
+		RegQueryValueExW(hKey, L"AntCount", NULL, NULL, (LPBYTE)&g_AntCount, &size);
+		size = sizeof(int); 
+		RegQueryValueExW(hKey, L"AntSpeed", NULL, NULL, (LPBYTE)&g_AntSpeed, &size);
 		RegCloseKey(hKey);
 	}
 }
@@ -115,6 +121,8 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
 		RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
 		RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
+		RegSetValueExW(hKey, L"AntCount", 0, REG_DWORD, (const BYTE*)&g_AntCount, sizeof(int));
+		RegSetValueExW(hKey, L"AntSpeed", 0, REG_DWORD, (const BYTE*)&g_AntSpeed, sizeof(int));
 		RegCloseKey(hKey);
 	}
 }
@@ -124,16 +132,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	srand((unsigned int)time(NULL));
 	LoadSettings();
 
-	// Map string names to mode indices
 	const struct { const wchar_t* name; int idx; } modeMap[] = {
 		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
 		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
 		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"bogo", 15},
-		{L"sort", 16}
+		{L"sort", 16}, {L"ant", 17}
 	};
 
-	// Robustly parse for two screensaver names (ignore /s, /p, /c, etc.)
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
 	WCHAR* context = NULL;
 	WCHAR* token = wcstok_s(cmdCopy, L" \t", &context);
@@ -144,7 +150,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			foundArgs[foundCount++] = token;
 		}
 		token = wcstok_s(NULL, L" \t", &context);
-	}
+	}	
 	if (foundCount == 1 || foundCount == 2) {
 		int found1 = -1, found2 = -1;
 		for (int i = 0; i < (int)(sizeof(modeMap)/sizeof(modeMap[0])); ++i) {
@@ -364,7 +370,7 @@ void ShowSettingsWindow(HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverSettingsClass", L"Screensaver Settings",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 750, 550,
+		CW_USEDEFAULT, CW_USEDEFAULT, 750, 650,
 		nullptr, nullptr, hInstance, nullptr);
 
 	MSG msg;
@@ -428,6 +434,16 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		HWND h9 = CreateWindowW(L"STATIC", L"Spin:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
 		HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL);
+		
+		y += secH;
+		HWND hL8 = CreateWindowW(L"STATIC", L"Langton's Ant", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
+		SendMessage(hL8, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
+
+		HWND hAnt1 = CreateWindowW(L"STATIC", L"Sets (Symmetry):", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hAntCount = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_ANT_COUNT, hInst, NULL); y += rowH;
+
+		HWND hAnt2 = CreateWindowW(L"STATIC", L"Speed (Ops/f):", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hAntSpeed = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_ANT_SPEED, hInst, NULL);
 
 		y = 5;
 
@@ -465,12 +481,15 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND h8 = CreateWindowW(L"STATIC", L"Secondary:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
 		HWND hC2 = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, col2X + 150, y, edtW, 300, hWnd, (HMENU)IDC_COMBO_SECONDARY, hInst, NULL);
 
-		y = 460;
-		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, col1X, y, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
-
 		int btnW = 100;
 		int btnH = 35;
 		int rightBtnX = 400;
+
+		// Placed above the buttons on the right side (y = 520)
+		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
+			rightBtnX, 520, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
+
+		y = 560; // Set Y for the bottom row of buttons
 
 		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
 			rightBtnX, y, btnW, btnH, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
@@ -481,14 +500,14 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hRand, hOk, hReset, hCancel };
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hAnt1, hAntCount, hAnt2, hAntSpeed, hRand, hOk, hReset, hCancel };
 		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
 								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
 								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort",
-								   L"Sorting Algorithms"
+								   L"Sorting Algorithms", L"Langton's Ant Symmetrical"
 		};
 		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
@@ -509,6 +528,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.1f", g_MazeSolveSpeed);SetWindowTextA(hMS, buf);
 		sprintf_s(buf, "%.4f", g_PerlinScale);   SetWindowTextA(hPerlinScale, buf);
 		sprintf_s(buf, "%.1f", g_DvdSpeed); SetWindowTextA(hDS, buf);
+		sprintf_s(buf, "%d", g_AntCount); SetWindowTextA(hAntCount, buf);
+		sprintf_s(buf, "%d", g_AntSpeed); SetWindowTextA(hAntSpeed, buf);
 
 		SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
 		SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
@@ -532,6 +553,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf, 32); g_PerlinScale = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf, 32); g_AntCount = atoi(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf, 32); g_AntSpeed = atoi(buf);
 
 			g_ModePrimary = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_GETCURSEL, 0, 0);
 			g_ModeSecondary = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_GETCURSEL, 0, 0);
@@ -541,6 +564,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			if (g_GolSpeed < 10)      g_GolSpeed = 10;
 			if (g_MazeBuildSpeed < 1) g_MazeBuildSpeed = 1.0f;
 			if (g_MazeSolveSpeed < 1) g_MazeSolveSpeed = 1.0f;
+			if (g_AntCount < 1) g_AntCount = 1;
 
 			SaveSettings();
 			PostQuitMessage(0);
@@ -561,6 +585,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			sprintf_s(buf, "%.1f", DEFAULT_MAZEBUILDSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
 			sprintf_s(buf, "%.1f", DEFAULT_MAZESOLVESPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 			sprintf_s(buf, "%.4f", DEFAULT_PERLINSCALE); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
+			sprintf_s(buf, "%d", DEFAULT_ANT_COUNT); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf);
+			sprintf_s(buf, "%d", DEFAULT_ANT_SPEED); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf);
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, DEFAULT_MODEPRIMARY, 0);
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, DEFAULT_MODESECONDARY, 0);
 			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, DEFAULT_RANDOMMODE ? BST_CHECKED : BST_UNCHECKED, 0);

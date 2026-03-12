@@ -156,6 +156,7 @@
     <ClCompile Include="RenderGoL.cpp" />
     <ClCompile Include="RenderGrid.cpp" />
     <ClCompile Include="RenderJulia.cpp" />
+    <ClCompile Include="RenderLangton.cpp" />
     <ClCompile Include="RenderMatrix.cpp" />
     <ClCompile Include="RenderMaze.cpp" />
     <ClCompile Include="RenderMemoryDump.cpp" />
