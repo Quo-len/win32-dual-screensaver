@@ -42,7 +42,7 @@ static const RenderFn g_renderers[] = {
 	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin, RenderFire, RenderMemoryDump, RenderBogoSort,
+	RenderPerlin, RenderFire, RenderMemoryDump,
 	RenderRandomSort, RenderLangton
 };
 
@@ -136,8 +136,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
 		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
-		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"bogo", 15},
-		{L"sort", 16}, {L"ant", 17}
+		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15}, 
+		{L"ant", 16}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
@@ -447,7 +447,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		y = 5;
 
-
 		HWND hL5 = CreateWindowW(L"STATIC", L"Ping Pong", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL5, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
@@ -485,11 +484,10 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		int btnH = 35;
 		int rightBtnX = 400;
 
-		// Placed above the buttons on the right side (y = 520)
 		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
 			rightBtnX, 520, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
 
-		y = 560; // Set Y for the bottom row of buttons
+		y = 560;
 
 		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
 			rightBtnX, y, btnW, btnH, hWnd, (HMENU)IDOK_BTN, hInst, NULL);
@@ -506,8 +504,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
 								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
-								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"BogoSort",
-								   L"Sorting Algorithms", L"Langton's Ant Symmetrical"
+								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms", 
+								   L"Langton's Ant Symmetrical"
 		};
 		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);

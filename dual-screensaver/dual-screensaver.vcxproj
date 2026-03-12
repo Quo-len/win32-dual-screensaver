@@ -147,7 +147,6 @@
     <ClCompile Include="dual-screensaver.cpp" />
     <ClCompile Include="Perlin.cpp" />
     <ClCompile Include="RenderBlank.cpp" />
-    <ClCompile Include="RenderBogoSort.cpp" />
     <ClCompile Include="RenderClock.cpp" />
     <ClCompile Include="RenderDonut.cpp" />
     <ClCompile Include="RenderDVD.cpp" />

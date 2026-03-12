@@ -2,6 +2,7 @@
 #include "Renderers.h"
 #include "Settings.h"
 
+// add to settings ability to enter number of items and sorting speed, and maybe even specific algorithm to use (or exclude certain ones
 void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     int numItems = 100;
 
@@ -276,9 +277,11 @@ void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const 
 
     int barWidth = width / numItems;
     if (barWidth < 1) barWidth = 1;
-    int maxBarHeight = height - 150;
     int startX = (width - (numItems * barWidth)) / 2;
     if (startX < 0) startX = 0;
+
+    double barWidthDouble = (double)width / numItems;
+    int maxBarHeight = height - 150;
 
     HBRUSH defaultBrush = CreateSolidBrush(RGB(200, 200, 200));
     HBRUSH redBrush = CreateSolidBrush(RGB(255, 50, 50));
@@ -291,7 +294,15 @@ void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const 
         else if (data->sortState == 3) brush = greenBrush;
 
         int barH = (data->sortArray[i] * maxBarHeight) / numItems;
-        RECT r = { startX + i * barWidth, height - barH, startX + i * barWidth + barWidth - (barWidth > 2 ? 1 : 0), height };
+
+        int left = (int)(i * barWidthDouble);
+        int right = (int)((i + 1) * barWidthDouble);
+
+        if (right - left > 2) {
+            right -= 1;
+        }
+
+        RECT r = { left, height - barH, right, height };
         FillRect(memDC, &r, brush);
     }
 

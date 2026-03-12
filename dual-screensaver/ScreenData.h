@@ -91,12 +91,6 @@ struct ScreenData {
     HFONT hHexFont = NULL;
     int hexLastWidth = 0;
 
-    std::vector<int> bogoArray;
-    bool bogoSorted = false;
-    int bogoAttempts = 0;
-    long long bogoComparisons = 0;
-    int bogoWaitTimer = 0;
-
     std::vector<int> sortArray;
     int sortState = 0;
     int sortAlgo = 0;

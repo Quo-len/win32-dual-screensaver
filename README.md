@@ -14,14 +14,31 @@ A Win32 dual-monitor screensaver for Windows with configurable visual modes and 
   - Matrix rain
   - ASCII Earth
   - Blank mode with away-time message
+  - Julia fractal
+  - Stars
+  - DVD logo bounce
+  - Grid
+  - Pong
+  - Maze (build/solve)
+  - Clock
+  - Perlin noise
+  - Fire
+  - Memory Dump
+  - RandomSort
+  - Langton's Ant
 
 ## Settings
 
-The settings window allows configuring:
+The settings window allows configuring (per mode):
 
 - Donut: A speed, B speed, donut size, text size
-- Game of Life: cell size and update speed
+- Game of Life: cell size, update speed
 - Earth: spin speed
+- Pong: speed
+- DVD: speed
+- Maze: build speed, solve speed
+- Perlin: scale
+- Langton's Ant: ant count, ant speed
 - Monitor mode mapping (primary/secondary)
 - Randomize modes every launch
 

@@ -92,9 +92,6 @@
     <ClCompile Include="RenderPerlin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderBogoSort.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="RenderMemoryDump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
