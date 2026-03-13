@@ -3,6 +3,12 @@
 #include <string>
 #include <windows.h>
 
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+struct IDXGISwapChain;
+struct ID3D11Texture2D;
+struct IDXGISurface1;
+
 struct MazeCell {
     bool visited;
     bool wallTop, wallRight, wallBottom, wallLeft;
@@ -115,4 +121,10 @@ struct ScreenData {
     int antCols = 0;
     int antRows = 0;
     unsigned int currentAntColor;
+
+    ID3D11Device* pDevice = nullptr;
+    ID3D11DeviceContext* pContext = nullptr;
+    IDXGISwapChain* pSwapChain = nullptr;
+    ID3D11Texture2D* pBackBuffer = nullptr;
+    IDXGISurface1* pSurface = nullptr;
 };

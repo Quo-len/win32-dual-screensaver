@@ -27,9 +27,9 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
 
     uint32_t* px = data->pixels.data();
     int totalPixels = width * height;
-
     const int fadeSpeed = 6;
 
+    #pragma omp parallel for
     for (int i = 0; i < totalPixels; i++) {
         uint32_t c = px[i];
 
@@ -46,33 +46,43 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
 
     data->flowZOff += 0.003f;
     const float PI = 3.14159265358979323846f;
+    const int speedMultiplier = g_PerlinSpeed;
 
-    for (auto& p : data->flowParticles) {
+    int particleCount = (int)data->flowParticles.size();
+
+    int steps = (int)ceil(g_PerlinSpeed);
+    float stepFraction = g_PerlinSpeed / (float)steps;
+
+    #pragma omp parallel for
+    for (int i = 0; i < particleCount; i++) {
+        auto& p = data->flowParticles[i];
+
         float noiseVal = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm);
         float angle = noiseVal * PI * 4.0f;
 
         float vx = cos(angle);
         float vy = sin(angle);
 
-        p.x += vx * 2.5f;
-        p.y += vy * 2.5f;
+        for (int step = 0; step < steps; ++step) {
+            p.x += vx * 2.5f * stepFraction;
+            p.y += vy * 2.5f * stepFraction;
 
-        int ix = (int)p.x;
-        int iy = (int)p.y;
+            int ix = (int)p.x;
+            int iy = (int)p.y;
 
-        if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+            if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+                int r = (int)((cos(angle) + 1.0f) * 55.0f) + 130;
+                int g = (int)((sin(angle) + 1.0f) * 20.0f) + 10;
+                int b = 250;
 
-            int r = (int)((cos(angle) + 1.0f) * 55.0f) + 130;
-            int g = (int)((sin(angle) + 1.0f) * 20.0f) + 10;
-            int b = 250;
+                if (r > 255) r = 255;
+                if (g > 255) g = 255;
 
-            if (r > 255) r = 255;
-            if (g > 255) g = 255;
-
-            data->pixels[iy * width + ix] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                data->pixels[iy * width + ix] = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
         }
 
-        p.life--;
+        p.life -= steps;
 
         if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height || p.life <= 0) {
             p.x = (float)(rand() % width);

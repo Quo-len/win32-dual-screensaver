@@ -22,6 +22,7 @@
 #define IDC_EDIT_DVD_SPEED        1019
 #define IDC_EDIT_ANT_COUNT        1020
 #define IDC_EDIT_ANT_SPEED        1021
+#define IDC_EDIT_PERLIN_SPEED	  1022
 
 
 
@@ -37,6 +38,7 @@ extern float g_PongSpeed;
 extern float g_MazeBuildSpeed;
 extern float g_MazeSolveSpeed;
 extern float g_PerlinScale;
+extern float g_PerlinSpeed;
 extern int g_AntCount;
 extern int g_AntSpeed;
 extern int g_ModePrimary;

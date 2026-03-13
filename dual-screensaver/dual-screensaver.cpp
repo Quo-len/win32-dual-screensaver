@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <d3d11.h>
+#include <dxgi.h>
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+
 #define MAX_LOADSTRING 100
 
 HINSTANCE hInst;
@@ -28,6 +33,7 @@ float g_DvdSpeed = DEFAULT_DVDSPEED;
 float g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED;
 float g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED;
 float g_PerlinScale = DEFAULT_PERLINSCALE;
+float g_PerlinSpeed = DEFAULT_PERLINSPEED;
 int g_AntCount = DEFAULT_ANT_COUNT;
 int g_AntSpeed = DEFAULT_ANT_SPEED;
 
@@ -66,7 +72,7 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"BSpeed", NULL, NULL, (LPBYTE)&g_BSpeed, &size);
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"DonutSize", NULL, NULL, (LPBYTE)&g_DonutSize, &size);
-		size = sizeof(int);
+		size = sizeof(float);
 		RegQueryValueExW(hKey, L"DonutDistance", NULL, NULL, (LPBYTE)&g_DonutDistance, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"TextSize", NULL, NULL, (LPBYTE)&g_TextSize, &size);
@@ -86,6 +92,8 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"MazeSolveSpeed", NULL, NULL, (LPBYTE)&g_MazeSolveSpeed, &size);
 		size = sizeof(float);
 		RegQueryValueExW(hKey, L"PerlinScale", NULL, NULL, (LPBYTE)&g_PerlinScale, &size);
+		size = sizeof(float);
+		RegQueryValueExW(hKey, L"PerlinSpeed", NULL, NULL, (LPBYTE)&g_PerlinSpeed, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"ModePrimary", NULL, NULL, (LPBYTE)&g_ModePrimary, &size);
 		size = sizeof(int);
@@ -94,7 +102,7 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"RandomMode", NULL, NULL, (LPBYTE)&g_RandomMode, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"AntCount", NULL, NULL, (LPBYTE)&g_AntCount, &size);
-		size = sizeof(int); 
+		size = sizeof(int);
 		RegQueryValueExW(hKey, L"AntSpeed", NULL, NULL, (LPBYTE)&g_AntSpeed, &size);
 		RegCloseKey(hKey);
 	}
@@ -118,6 +126,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"MazeBuildSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeBuildSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"MazeSolveSpeed", 0, REG_DWORD, (const BYTE*)&g_MazeSolveSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"PerlinScale", 0, REG_DWORD, (const BYTE*)&g_PerlinScale, sizeof(float));
+		RegSetValueExW(hKey, L"PerlinSpeed", 0, REG_DWORD, (const BYTE*)&g_PerlinSpeed, sizeof(float));
 		RegSetValueExW(hKey, L"ModePrimary", 0, REG_DWORD, (const BYTE*)&g_ModePrimary, sizeof(int));
 		RegSetValueExW(hKey, L"ModeSecondary", 0, REG_DWORD, (const BYTE*)&g_ModeSecondary, sizeof(int));
 		RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
@@ -136,31 +145,32 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
 		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
-		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15}, 
+		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15},
 		{L"ant", 16}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
 	WCHAR* context = NULL;
 	WCHAR* token = wcstok_s(cmdCopy, L" \t", &context);
-	WCHAR* foundArgs[2] = {NULL, NULL};
+	WCHAR* foundArgs[2] = { NULL, NULL };
 	int foundCount = 0;
 	while (token && foundCount < 2) {
 		if (token[0] != L'/' && token[0] != L'-') {
 			foundArgs[foundCount++] = token;
 		}
 		token = wcstok_s(NULL, L" \t", &context);
-	}	
+	}
 	if (foundCount == 1 || foundCount == 2) {
 		int found1 = -1, found2 = -1;
-		for (int i = 0; i < (int)(sizeof(modeMap)/sizeof(modeMap[0])); ++i) {
+		for (int i = 0; i < (int)(sizeof(modeMap) / sizeof(modeMap[0])); ++i) {
 			if (foundArgs[0] && _wcsicmp(foundArgs[0], modeMap[i].name) == 0) found1 = modeMap[i].idx;
 			if (foundCount == 2 && foundArgs[1] && _wcsicmp(foundArgs[1], modeMap[i].name) == 0) found2 = modeMap[i].idx;
 		}
 		if (found1 >= 0 && foundCount == 1) {
 			g_ModePrimary = found1;
 			g_RandomMode = 0;
-		} else if (found1 >= 0 && found2 >= 0 && foundCount == 2) {
+		}
+		else if (found1 >= 0 && found2 >= 0 && foundCount == 2) {
 			g_ModePrimary = found1;
 			g_ModeSecondary = found2;
 			g_RandomMode = 0;
@@ -285,8 +295,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			unsigned int monitorSeed = (unsigned int)GetTickCount64() + (rand() % 10000);
 			initPerlin(monitorSeed, data->perm);
+
+			RECT rect;
+			GetClientRect(hWnd, &rect);
+			int width = rect.right - rect.left;
+			int height = rect.bottom - rect.top;
+			if (width <= 0) width = 1;
+			if (height <= 0) height = 1;
+
+			DXGI_SWAP_CHAIN_DESC sd = { 0 };
+			sd.BufferCount = 1;
+			sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+			sd.BufferDesc.Width = width;
+			sd.BufferDesc.Height = height;
+			sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+			sd.OutputWindow = hWnd;
+			sd.SampleDesc.Count = 1;
+			sd.Windowed = TRUE;
+			sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+			sd.Flags = DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
+
+			UINT createFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+
+			HRESULT hr = D3D11CreateDeviceAndSwapChain(
+				nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createFlags,
+				nullptr, 0, D3D11_SDK_VERSION, &sd,
+				&data->pSwapChain, &data->pDevice, nullptr, &data->pContext);
+
+			if (SUCCEEDED(hr)) {
+				data->pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&data->pBackBuffer);
+				data->pBackBuffer->QueryInterface(__uuidof(IDXGISurface1), (LPVOID*)&data->pSurface);
+			}
 		}
-		SetTimer(hWnd, 1, 33, NULL);
+		SetTimer(hWnd, 1, 16, NULL);
 		break;
 	case WM_TIMER:
 		InvalidateRect(hWnd, NULL, FALSE);
@@ -294,31 +335,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC hdc = BeginPaint(hWnd, &ps);
+		BeginPaint(hWnd, &ps);
+
 		RECT rect;
 		GetClientRect(hWnd, &rect);
-
 		int width = rect.right - rect.left;
 		int height = rect.bottom - rect.top;
 
-		HDC memDC = CreateCompatibleDC(hdc);
-		HBITMAP hMemBmp = CreateCompatibleBitmap(hdc, width, height);
-		HBITMAP hOldBmp = (HBITMAP)SelectObject(memDC, hMemBmp);
+		if (data && data->pSurface) {
+			HDC hdc = NULL;
 
-		FillRect(memDC, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-		SetBkMode(memDC, OPAQUE);
-		SetBkColor(memDC, RGB(0, 0, 0));
+			if (SUCCEEDED(data->pSurface->GetDC(FALSE, &hdc)) && hdc) {
 
-		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
+				FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
+				SetBkMode(hdc, OPAQUE);
+				SetBkColor(hdc, RGB(0, 0, 0));
 
-		if (mode >= 0 && mode < NUM_SCREENSAVERS)
-			g_renderers[mode](memDC, data, width, height, rect);
+				int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
-		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+				if (mode >= 0 && mode < NUM_SCREENSAVERS)
+					g_renderers[mode](hdc, data, width, height, rect);
 
-		SelectObject(memDC, hOldBmp);
-		DeleteObject(hMemBmp);
-		DeleteDC(memDC);
+				data->pSurface->ReleaseDC(nullptr);
+
+				data->pSwapChain->Present(1, 0);
+			}
+		}
 
 		EndPaint(hWnd, &ps);
 	}
@@ -343,6 +385,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_DESTROY:
 		if (data) {
+			if (data->pSurface) data->pSurface->Release();
+			if (data->pBackBuffer) data->pBackBuffer->Release();
+			if (data->pSwapChain) data->pSwapChain->Release();
+			if (data->pContext) data->pContext->Release();
+			if (data->pDevice) data->pDevice->Release();
+
 			if (data->hFont) DeleteObject(data->hFont);
 			if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
 			delete data;
@@ -434,7 +482,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		HWND h9 = CreateWindowW(L"STATIC", L"Spin:", WS_CHILD | WS_VISIBLE, col1X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
 		HWND hES = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col1X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_EARTH_SPEED, hInst, NULL);
-		
+
 		y += secH;
 		HWND hL8 = CreateWindowW(L"STATIC", L"Langton's Ant", WS_CHILD | WS_VISIBLE, col1X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL8, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
@@ -469,7 +517,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		SendMessage(hL7, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
 
 		HWND h13 = CreateWindowW(L"STATIC", L"Scale:", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
-		HWND hPerlinScale = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PERLIN_SCALE, hInst, NULL); y += secH;
+		HWND hPerlinScale = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PERLIN_SCALE, hInst, NULL);
+		y += rowH;
+
+		HWND h14 = CreateWindowW(L"STATIC", L"Speed (1-10):", WS_CHILD | WS_VISIBLE, col2X + 10, y, lblW, 25, hWnd, NULL, hInst, NULL);
+		HWND hPerlinSpeed = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, col2X + 150, y, edtW, 30, hWnd, (HMENU)IDC_EDIT_PERLIN_SPEED, hInst, NULL);
+		y += secH;
 
 		HWND hL3 = CreateWindowW(L"STATIC", L"Monitors", WS_CHILD | WS_VISIBLE, col2X, y, 250, 30, hWnd, NULL, hInst, NULL);
 		SendMessage(hL3, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0)); y += 40;
@@ -498,13 +551,13 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h7, hC1, h8, hC2, hAnt1, hAntCount, hAnt2, hAntSpeed, hRand, hOk, hReset, hCancel };
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h14, hPerlinSpeed, h7, hC1, h8, hC2, hAnt1, hAntCount, hAnt2, hAntSpeed, hRand, hOk, hReset, hCancel };
 		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
 		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
 								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
-								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms", 
+								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
 								   L"Langton's Ant Symmetrical"
 		};
 		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
@@ -525,6 +578,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		sprintf_s(buf, "%.1f", g_MazeBuildSpeed);SetWindowTextA(hMB, buf);
 		sprintf_s(buf, "%.1f", g_MazeSolveSpeed);SetWindowTextA(hMS, buf);
 		sprintf_s(buf, "%.4f", g_PerlinScale);   SetWindowTextA(hPerlinScale, buf);
+		sprintf_s(buf, "%.2f", g_PerlinSpeed);     SetWindowTextA(hPerlinSpeed, buf);
 		sprintf_s(buf, "%.1f", g_DvdSpeed); SetWindowTextA(hDS, buf);
 		sprintf_s(buf, "%d", g_AntCount); SetWindowTextA(hAntCount, buf);
 		sprintf_s(buf, "%d", g_AntSpeed); SetWindowTextA(hAntSpeed, buf);
@@ -551,6 +605,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf, 32); g_MazeBuildSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf, 32); g_MazeSolveSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf, 32); g_PerlinScale = (float)atof(buf);
+			GetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SPEED, buf, 32); g_PerlinSpeed = (float)atof(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf, 32); g_AntCount = atoi(buf);
 			GetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf, 32); g_AntSpeed = atoi(buf);
 
@@ -562,6 +617,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			if (g_GolSpeed < 10)      g_GolSpeed = 10;
 			if (g_MazeBuildSpeed < 1) g_MazeBuildSpeed = 1.0f;
 			if (g_MazeSolveSpeed < 1) g_MazeSolveSpeed = 1.0f;
+			if (g_PerlinSpeed < 0.0f) g_PerlinSpeed = 0.1f;
 			if (g_AntCount < 1) g_AntCount = 1;
 
 			SaveSettings();
@@ -583,6 +639,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			sprintf_s(buf, "%.1f", DEFAULT_MAZEBUILDSPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
 			sprintf_s(buf, "%.1f", DEFAULT_MAZESOLVESPEED);  SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
 			sprintf_s(buf, "%.4f", DEFAULT_PERLINSCALE); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
+			sprintf_s(buf, "%.2f", DEFAULT_PERLINSPEED); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SPEED, buf);
 			sprintf_s(buf, "%d", DEFAULT_ANT_COUNT); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf);
 			sprintf_s(buf, "%d", DEFAULT_ANT_SPEED); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf);
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, DEFAULT_MODEPRIMARY, 0);
