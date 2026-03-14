@@ -29,7 +29,6 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     int totalPixels = width * height;
     const int fadeSpeed = 6;
 
-    #pragma omp parallel for
     for (int i = 0; i < totalPixels; i++) {
         uint32_t c = px[i];
 
@@ -53,7 +52,6 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     int steps = (int)ceil(g_PerlinSpeed);
     float stepFraction = g_PerlinSpeed / (float)steps;
 
-    #pragma omp parallel for
     for (int i = 0; i < particleCount; i++) {
         auto& p = data->flowParticles[i];
 
