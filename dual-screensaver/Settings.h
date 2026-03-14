@@ -24,8 +24,6 @@
 #define IDC_EDIT_ANT_SPEED        1021
 #define IDC_EDIT_PERLIN_SPEED	  1022
 
-
-
 extern float g_ASpeed;
 extern float g_BSpeed;
 extern float g_DonutSize;

@@ -4,6 +4,8 @@
 #include <vector>
 
 void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    if (width <= 0 || height <= 0) return;
+
     int cellSize = max(10, g_TextSize);
     int padding = 40;
     int mCols = (width - padding * 2) / cellSize;
@@ -11,6 +13,15 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
 
     if (mCols <= 2) mCols = 3;
     if (mRows <= 2) mRows = 3;
+
+    // 1. Manage Pixel Buffer Size
+    if (data->pixels.size() != (size_t)(width * height)) {
+        data->pixels.assign(width * height, 0x00000000);
+    }
+    else {
+        // Fast-clear screen to black
+        memset(data->pixels.data(), 0, width * height * sizeof(uint32_t));
+    }
 
     if (data->mazeCols != mCols || data->mazeRows != mRows || data->mazeGrid.empty() || data->mazeState == 0) {
         data->mazeCols = mCols;
@@ -36,6 +47,7 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
     DWORD now = GetTickCount64();
     int stepsPerFrame = max(1, (int)(data->mazeState == 1 ? g_MazeBuildSpeed : g_MazeSolveSpeed));
 
+    // 2. Original Maze Generation Logic (Unchanged)
     if (now - data->lastMazeUpdate > 16) {
         data->lastMazeUpdate = now;
 
@@ -116,15 +128,32 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
     int offsetX = (width - (data->mazeCols * cellSize)) / 2;
     int offsetY = (height - (data->mazeRows * cellSize)) / 2;
 
-    HPEN hWallPen = CreatePen(PS_SOLID, 2, RGB(0, 255, 0));
-    HPEN hOldPen = (HPEN)SelectObject(memDC, hWallPen);
-    HBRUSH hPathBrush = CreateSolidBrush(RGB(255, 0, 0));
-    HBRUSH hSolveBrush = CreateSolidBrush(RGB(50, 50, 150));
-    HBRUSH hHeadBrush = CreateSolidBrush(RGB(255, 255, 255));
-    HBRUSH hStartBrush = CreateSolidBrush(RGB(255, 255, 0));
-    HBRUSH hEndBrush = CreateSolidBrush(RGB(0, 255, 255));
-    HBRUSH hOldBrush = (HBRUSH)SelectObject(memDC, GetStockObject(NULL_BRUSH));
+    // 3. Fast Pixel Writing Helper
+    uint32_t* pxArr = data->pixels.data();
+    auto FillRectPx = [&](int rx, int ry, int rw, int rh, uint32_t color) {
+        int startX = max(0, rx);
+        int startY = max(0, ry);
+        int endX = min(width, rx + rw);
+        int endY = min(height, ry + rh);
+        if (startX >= endX || startY >= endY) return;
 
+        for (int y = startY; y < endY; ++y) {
+            int rowOffset = y * width;
+            for (int x = startX; x < endX; ++x) {
+                pxArr[rowOffset + x] = color;
+            }
+        }
+        };
+
+    // Define colors directly as BGRA 32-bit integers
+    const uint32_t COLOR_PATH = 0xFFFF0000; // Red
+    const uint32_t COLOR_SOLVE = 0xFF963232; // Purple-ish
+    const uint32_t COLOR_WALL = 0xFF00FF00; // Green
+    const uint32_t COLOR_START = 0xFFFFFF00; // Yellow
+    const uint32_t COLOR_END = 0xFF00FFFF; // Cyan
+    const uint32_t COLOR_HEAD = 0xFFFFFFFF; // White
+
+    // 4. Draw Maze entirely into RAM
     for (int cy = 0; cy < data->mazeRows; cy++) {
         for (int cx = 0; cx < data->mazeCols; cx++) {
             int i = cy * data->mazeCols + cx;
@@ -132,19 +161,17 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
             int py = offsetY + cy * cellSize;
 
             if (data->mazeGrid[i].inPath) {
-                RECT rc = { px + cellSize / 4, py + cellSize / 4, px + cellSize - cellSize / 4, py + cellSize - cellSize / 4 };
-                FillRect(memDC, &rc, hPathBrush);
+                FillRectPx(px + cellSize / 4, py + cellSize / 4, cellSize - (cellSize / 4) * 2, cellSize - (cellSize / 4) * 2, COLOR_PATH);
             }
             else if (data->mazeGrid[i].solveVisited) {
-                RECT rc = { px + cellSize / 3, py + cellSize / 3, px + cellSize - cellSize / 3, py + cellSize - cellSize / 3 };
-                FillRect(memDC, &rc, hSolveBrush);
+                FillRectPx(px + cellSize / 3, py + cellSize / 3, cellSize - (cellSize / 3) * 2, cellSize - (cellSize / 3) * 2, COLOR_SOLVE);
             }
 
             if (data->mazeGrid[i].visited) {
-                if (data->mazeGrid[i].wallTop) { MoveToEx(memDC, px, py, NULL); LineTo(memDC, px + cellSize, py); }
-                if (data->mazeGrid[i].wallBottom) { MoveToEx(memDC, px, py + cellSize, NULL); LineTo(memDC, px + cellSize, py + cellSize); }
-                if (data->mazeGrid[i].wallLeft) { MoveToEx(memDC, px, py, NULL); LineTo(memDC, px, py + cellSize); }
-                if (data->mazeGrid[i].wallRight) { MoveToEx(memDC, px + cellSize, py, NULL); LineTo(memDC, px + cellSize, py + cellSize); }
+                if (data->mazeGrid[i].wallTop) FillRectPx(px, py, cellSize, 2, COLOR_WALL);
+                if (data->mazeGrid[i].wallBottom) FillRectPx(px, py + cellSize - 2, cellSize, 2, COLOR_WALL);
+                if (data->mazeGrid[i].wallLeft) FillRectPx(px, py, 2, cellSize, COLOR_WALL);
+                if (data->mazeGrid[i].wallRight) FillRectPx(px + cellSize - 2, py, 2, cellSize, COLOR_WALL);
             }
         }
     }
@@ -152,36 +179,34 @@ void RenderMaze(HDC memDC, ScreenData* data, int width, int height, const RECT& 
     if (data->mazeState > 0) {
         int sx = (data->mazeStart % data->mazeCols) * cellSize + offsetX;
         int sy = (data->mazeStart / data->mazeCols) * cellSize + offsetY;
-        RECT sr = { sx + 2, sy + 2, sx + cellSize - 2, sy + cellSize - 2 };
-        FillRect(memDC, &sr, hStartBrush);
+        FillRectPx(sx + 2, sy + 2, cellSize - 4, cellSize - 4, COLOR_START);
 
         int ex = (data->mazeEnd % data->mazeCols) * cellSize + offsetX;
         int ey = (data->mazeEnd / data->mazeCols) * cellSize + offsetY;
-        RECT er = { ex + 2, ey + 2, ex + cellSize - 2, ey + cellSize - 2 };
-        FillRect(memDC, &er, hEndBrush);
+        FillRectPx(ex + 2, ey + 2, cellSize - 4, cellSize - 4, COLOR_END);
     }
 
     if (data->mazeState == 1 && !data->mazeStack.empty()) {
         int current = data->mazeStack.back();
         int cx = current % data->mazeCols;
         int cy = current / data->mazeCols;
-        RECT rc = { offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, offsetX + (cx + 1) * cellSize - 2, offsetY + (cy + 1) * cellSize - 2 };
-        FillRect(memDC, &rc, hHeadBrush);
+        FillRectPx(offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, cellSize - 4, cellSize - 4, COLOR_HEAD);
     }
     else if (data->mazeState == 2 && !data->solveStack.empty()) {
         int current = data->solveStack.back();
         int cx = current % data->mazeCols;
         int cy = current / data->mazeCols;
-        RECT rc = { offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, offsetX + (cx + 1) * cellSize - 2, offsetY + (cy + 1) * cellSize - 2 };
-        FillRect(memDC, &rc, hHeadBrush);
+        FillRectPx(offsetX + cx * cellSize + 2, offsetY + cy * cellSize + 2, cellSize - 4, cellSize - 4, COLOR_HEAD);
     }
 
-    SelectObject(memDC, hOldPen);
-    SelectObject(memDC, hOldBrush);
-    DeleteObject(hWallPen);
-    DeleteObject(hPathBrush);
-    DeleteObject(hSolveBrush);
-    DeleteObject(hHeadBrush);
-    DeleteObject(hStartBrush);
-    DeleteObject(hEndBrush);
+    // 5. Blast the final image to the screen in a single command
+    BITMAPINFO bmi = { 0 };
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = width;
+    bmi.bmiHeader.biHeight = -height;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    StretchDIBits(memDC, 0, 0, width, height, 0, 0, width, height, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }

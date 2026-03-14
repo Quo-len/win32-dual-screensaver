@@ -9,11 +9,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <d3d11.h>
-#include <dxgi.h>
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-
 #define MAX_LOADSTRING 100
 
 HINSTANCE hInst;
@@ -295,39 +290,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			unsigned int monitorSeed = (unsigned int)GetTickCount64() + (rand() % 10000);
 			initPerlin(monitorSeed, data->perm);
-
-			RECT rect;
-			GetClientRect(hWnd, &rect);
-			int width = rect.right - rect.left;
-			int height = rect.bottom - rect.top;
-			if (width <= 0) width = 1;
-			if (height <= 0) height = 1;
-
-			DXGI_SWAP_CHAIN_DESC sd = { 0 };
-			sd.BufferCount = 1;
-			sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-			sd.BufferDesc.Width = width;
-			sd.BufferDesc.Height = height;
-			sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-			sd.OutputWindow = hWnd;
-			sd.SampleDesc.Count = 1;
-			sd.Windowed = TRUE;
-			sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-			sd.Flags = DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
-
-			UINT createFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-
-			HRESULT hr = D3D11CreateDeviceAndSwapChain(
-				nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createFlags,
-				nullptr, 0, D3D11_SDK_VERSION, &sd,
-				&data->pSwapChain, &data->pDevice, nullptr, &data->pContext);
-
-			if (SUCCEEDED(hr)) {
-				data->pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&data->pBackBuffer);
-				data->pBackBuffer->QueryInterface(__uuidof(IDXGISurface1), (LPVOID*)&data->pSurface);
-			}
 		}
-		SetTimer(hWnd, 1, 16, NULL);
+		SetTimer(hWnd, 1, 33, NULL);
 		break;
 	case WM_TIMER:
 		InvalidateRect(hWnd, NULL, FALSE);
@@ -335,32 +299,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		BeginPaint(hWnd, &ps);
-
+		HDC hdc = BeginPaint(hWnd, &ps);
 		RECT rect;
 		GetClientRect(hWnd, &rect);
+
 		int width = rect.right - rect.left;
 		int height = rect.bottom - rect.top;
 
-		if (data && data->pSurface) {
-			HDC hdc = NULL;
+		HDC memDC = CreateCompatibleDC(hdc);
+		HBITMAP hMemBmp = CreateCompatibleBitmap(hdc, width, height);
+		HBITMAP hOldBmp = (HBITMAP)SelectObject(memDC, hMemBmp);
 
-			if (SUCCEEDED(data->pSurface->GetDC(FALSE, &hdc)) && hdc) {
+		FillRect(memDC, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
+		SetBkMode(memDC, OPAQUE);
+		SetBkColor(memDC, RGB(0, 0, 0));
 
-				FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-				SetBkMode(hdc, OPAQUE);
-				SetBkColor(hdc, RGB(0, 0, 0));
+		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
-				int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
+		if (mode >= 0 && mode < NUM_SCREENSAVERS)
+			g_renderers[mode](memDC, data, width, height, rect);
 
-				if (mode >= 0 && mode < NUM_SCREENSAVERS)
-					g_renderers[mode](hdc, data, width, height, rect);
+		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
-				data->pSurface->ReleaseDC(nullptr);
-
-				data->pSwapChain->Present(1, 0);
-			}
-		}
+		SelectObject(memDC, hOldBmp);
+		DeleteObject(hMemBmp);
+		DeleteDC(memDC);
 
 		EndPaint(hWnd, &ps);
 	}
@@ -385,12 +348,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_DESTROY:
 		if (data) {
-			if (data->pSurface) data->pSurface->Release();
-			if (data->pBackBuffer) data->pBackBuffer->Release();
-			if (data->pSwapChain) data->pSwapChain->Release();
-			if (data->pContext) data->pContext->Release();
-			if (data->pDevice) data->pDevice->Release();
-
 			if (data->hFont) DeleteObject(data->hFont);
 			if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
 			delete data;
