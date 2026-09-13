@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <vector>
 
 #define MAX_LOADSTRING 100
 
@@ -35,8 +36,17 @@ int g_AntSpeed = DEFAULT_ANT_SPEED;
 int g_ModePrimary = DEFAULT_MODEPRIMARY;
 int g_ModeSecondary = DEFAULT_MODESECONDARY;
 int g_RandomMode = DEFAULT_RANDOMMODE;
+unsigned int g_RandomPool = DEFAULT_RANDOM_POOL;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
+
+static const WCHAR* g_modeNames[] = {
+	L"Donut", L"Game of Life", L"Matrix", L"Earth",
+	L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
+	L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
+	L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
+	L"Langton's Ant Symmetrical"
+};
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
 static const RenderFn g_renderers[] = {
@@ -54,7 +64,9 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL CALLBACK       MonitorEnumProc(HMONITOR, HDC, LPRECT, LPARAM);
 LRESULT CALLBACK    ConfigWindowProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    PoolWindowProc(HWND, UINT, WPARAM, LPARAM);
 void                ShowSettingsWindow(HINSTANCE);
+void                ShowPoolWindow(HWND, HINSTANCE);
 
 void LoadSettings()
 {
@@ -99,6 +111,10 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"AntCount", NULL, NULL, (LPBYTE)&g_AntCount, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"AntSpeed", NULL, NULL, (LPBYTE)&g_AntSpeed, &size);
+		size = sizeof(unsigned int);
+		if (RegQueryValueExW(hKey, L"RandomPool", NULL, NULL, (LPBYTE)&g_RandomPool, &size) != ERROR_SUCCESS) {
+			g_RandomPool = DEFAULT_RANDOM_POOL;
+		}
 		RegCloseKey(hKey);
 	}
 }
@@ -127,12 +143,14 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
 		RegSetValueExW(hKey, L"AntCount", 0, REG_DWORD, (const BYTE*)&g_AntCount, sizeof(int));
 		RegSetValueExW(hKey, L"AntSpeed", 0, REG_DWORD, (const BYTE*)&g_AntSpeed, sizeof(int));
+		RegSetValueExW(hKey, L"RandomPool", 0, REG_DWORD, (const BYTE*)&g_RandomPool, sizeof(unsigned int));
 		RegCloseKey(hKey);
 	}
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
+	hInst = hInstance;
 	srand((unsigned int)time(NULL));
 	LoadSettings();
 
@@ -173,6 +191,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 	free(cmdCopy);
 
+	if (wcsstr(lpCmdLine, L"/pool") || wcsstr(lpCmdLine, L"/POOL"))
+	{
+		ShowPoolWindow(NULL, hInstance);
+		return 0;
+	}
+
 	if (wcsstr(lpCmdLine, L"/c") || wcsstr(lpCmdLine, L"/C"))
 	{
 		ShowSettingsWindow(hInstance);
@@ -180,8 +204,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	if (g_RandomMode) {
-		g_ModePrimary = rand() % NUM_SCREENSAVERS;
-		g_ModeSecondary = rand() % NUM_SCREENSAVERS;
+		std::vector<int> pool;
+		for (int i = 0; i < NUM_SCREENSAVERS; ++i) {
+			if (g_RandomPool & (1u << i)) {
+				pool.push_back(i);
+			}
+		}
+		if (pool.empty()) {
+			for (int i = 0; i < NUM_SCREENSAVERS; ++i) pool.push_back(i);
+		}
+		g_ModePrimary = pool[rand() % pool.size()];
+		g_ModeSecondary = pool[rand() % pool.size()];
 	}
 
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -361,6 +394,152 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+LRESULT CALLBACK PoolWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_CREATE:
+	{
+		HFONT hFont = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+		HFONT hBold = CreateFontW(19, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+
+		HWND hTitle = CreateWindowW(L"STATIC", L"Select screensavers to include in the random pool:",
+			WS_CHILD | WS_VISIBLE, 20, 15, 380, 25, hWnd, NULL, hInst, NULL);
+		SendMessage(hTitle, WM_SETFONT, (WPARAM)hBold, MAKELPARAM(TRUE, 0));
+
+		int col1X = 25;
+		int col2X = 215;
+		int startY = 48;
+		int rowH = 30;
+		int chkW = 175;
+
+		for (int i = 0; i < NUM_SCREENSAVERS; i++)
+		{
+			int x = (i < 9) ? col1X : col2X;
+			int y = startY + ((i < 9) ? i : (i - 9)) * rowH;
+
+			HWND hChk = CreateWindowW(L"BUTTON", g_modeNames[i],
+				WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
+				x, y, chkW, 26, hWnd, (HMENU)(INT_PTR)(IDC_POOL_CHECK_BASE + i), hInst, NULL);
+			SendMessage(hChk, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+			if (g_RandomPool & (1u << i))
+			{
+				SendMessage(hChk, BM_SETCHECK, BST_CHECKED, 0);
+			}
+		}
+
+		int btnY = startY + 9 * rowH + 15;
+		HWND hSelAll = CreateWindowW(L"BUTTON", L"Select All", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			25, btnY, 100, 30, hWnd, (HMENU)IDC_POOL_SELECT_ALL, hInst, NULL);
+		SendMessage(hSelAll, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		HWND hDeselAll = CreateWindowW(L"BUTTON", L"Deselect All", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			135, btnY, 100, 30, hWnd, (HMENU)IDC_POOL_DESELECT_ALL, hInst, NULL);
+		SendMessage(hDeselAll, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		int actY = btnY + 45;
+		HWND hOk = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+			180, actY, 95, 32, hWnd, (HMENU)IDOK, hInst, NULL);
+		SendMessage(hOk, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			285, actY, 95, 32, hWnd, (HMENU)IDCANCEL, hInst, NULL);
+		SendMessage(hCancel, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		break;
+	}
+	case WM_COMMAND:
+	{
+		WORD id = LOWORD(wParam);
+		if (id == IDC_POOL_SELECT_ALL)
+		{
+			for (int i = 0; i < NUM_SCREENSAVERS; i++)
+			{
+				CheckDlgButton(hWnd, IDC_POOL_CHECK_BASE + i, BST_CHECKED);
+			}
+		}
+		else if (id == IDC_POOL_DESELECT_ALL)
+		{
+			for (int i = 0; i < NUM_SCREENSAVERS; i++)
+			{
+				CheckDlgButton(hWnd, IDC_POOL_CHECK_BASE + i, BST_UNCHECKED);
+			}
+		}
+		else if (id == IDOK)
+		{
+			unsigned int newMask = 0;
+			for (int i = 0; i < NUM_SCREENSAVERS; i++)
+			{
+				if (IsDlgButtonChecked(hWnd, IDC_POOL_CHECK_BASE + i) == BST_CHECKED)
+				{
+					newMask |= (1u << i);
+				}
+			}
+			g_RandomPool = newMask;
+			SaveSettings();
+			DestroyWindow(hWnd);
+		}
+		else if (id == IDCANCEL)
+		{
+			DestroyWindow(hWnd);
+		}
+		break;
+	}
+	case WM_CLOSE:
+		DestroyWindow(hWnd);
+		break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
+}
+
+void ShowPoolWindow(HWND hWndParent, HINSTANCE hInstance)
+{
+	static bool s_classRegistered = false;
+	if (!s_classRegistered)
+	{
+		WNDCLASSEXW wcex = { sizeof(WNDCLASSEX) };
+		wcex.style = CS_HREDRAW | CS_VREDRAW;
+		wcex.lpfnWndProc = PoolWindowProc;
+		wcex.hInstance = hInstance;
+		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW);
+		wcex.lpszClassName = L"SaverPoolSettingsClass";
+		RegisterClassExW(&wcex);
+		s_classRegistered = true;
+	}
+
+	if (hWndParent) EnableWindow(hWndParent, FALSE);
+
+	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverPoolSettingsClass", L"Randomizer Pool Selection",
+		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
+		CW_USEDEFAULT, CW_USEDEFAULT, 420, 475,
+		hWndParent, nullptr, hInstance, nullptr);
+
+	MSG msg;
+	while (GetMessage(&msg, nullptr, 0, 0))
+	{
+		if (!IsDialogMessage(hWnd, &msg))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+
+	if (hWndParent)
+	{
+		EnableWindow(hWndParent, TRUE);
+		SetForegroundWindow(hWndParent);
+	}
+}
+
 void ShowSettingsWindow(HINSTANCE hInstance)
 {
 	WNDCLASSEXW wcex = { sizeof(WNDCLASSEX) };
@@ -495,7 +674,10 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		int rightBtnX = 400;
 
 		HWND hRand = CreateWindowW(L"BUTTON", L"Randomize every launch", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
-			rightBtnX, 520, 300, 35, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
+			rightBtnX, 517, 200, 30, hWnd, (HMENU)IDC_CHECK_RANDOM, hInst, NULL);
+
+		HWND hPoolBtn = CreateWindowW(L"BUTTON", L"Random Pool...", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			rightBtnX + 210, 516, 115, 32, hWnd, (HMENU)IDC_BTN_POOL, hInst, NULL);
 
 		y = 560;
 
@@ -508,18 +690,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		HWND hCancel = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			rightBtnX + 220, y, btnW, btnH, hWnd, (HMENU)IDCANCEL_BTN, hInst, NULL);
 
-		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h14, hPerlinSpeed, h7, hC1, h8, hC2, hAnt1, hAntCount, hAnt2, hAntSpeed, hRand, hOk, hReset, hCancel };
+		HWND controls[] = { h1, hA, h2, hB, h3, hS, hDistLbl, hDist, h4, hT, h5, hG1, h6, hG2, h9, hES, h10, hPS, h10b, hDS, h11, hMB, h12, hMS, h13, hPerlinScale, h14, hPerlinSpeed, h7, hC1, h8, hC2, hAnt1, hAntCount, hAnt2, hAntSpeed, hRand, hPoolBtn, hOk, hReset, hCancel };
 		for (HWND hw : controls) SendMessage(hw, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		const WCHAR* options[] = { L"Donut", L"Game of Life", L"Matrix", L"Earth",
-								   L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
-								   L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
-								   L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
-								   L"Langton's Ant Symmetrical"
-		};
 		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
-			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)options[i]);
-			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)options[i]);
+			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)g_modeNames[i]);
+			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)g_modeNames[i]);
 		}
 
 		char buf[32];
@@ -546,7 +722,11 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		break;
 	}
 	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK_BTN)
+		if (LOWORD(wParam) == IDC_BTN_POOL)
+		{
+			ShowPoolWindow(hWnd, hInst);
+		}
+		else if (LOWORD(wParam) == IDOK_BTN)
 		{
 			char buf[32];
 			GetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf, 32); g_ASpeed = (float)atof(buf);
@@ -602,6 +782,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_PRIMARY), CB_SETCURSEL, DEFAULT_MODEPRIMARY, 0);
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_SECONDARY), CB_SETCURSEL, DEFAULT_MODESECONDARY, 0);
 			SendMessage(GetDlgItem(hWnd, IDC_CHECK_RANDOM), BM_SETCHECK, DEFAULT_RANDOMMODE ? BST_CHECKED : BST_UNCHECKED, 0);
+			g_RandomPool = DEFAULT_RANDOM_POOL;
 		}
 		else if (LOWORD(wParam) == IDCANCEL_BTN)
 		{

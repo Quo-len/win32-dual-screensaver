@@ -23,6 +23,10 @@
 #define IDC_EDIT_ANT_COUNT        1020
 #define IDC_EDIT_ANT_SPEED        1021
 #define IDC_EDIT_PERLIN_SPEED	  1022
+#define IDC_BTN_POOL              1023
+#define IDC_POOL_SELECT_ALL       1024
+#define IDC_POOL_DESELECT_ALL     1025
+#define IDC_POOL_CHECK_BASE       1100
 
 extern float g_ASpeed;
 extern float g_BSpeed;
@@ -42,7 +46,9 @@ extern int g_AntSpeed;
 extern int g_ModePrimary;
 extern int g_ModeSecondary;
 extern int g_RandomMode;
+extern unsigned int g_RandomPool;
 extern const WCHAR* REG_PATH;
 
 void LoadSettings();
 void SaveSettings();
+void ShowPoolWindow(HWND hWndParent, HINSTANCE hInstance);
