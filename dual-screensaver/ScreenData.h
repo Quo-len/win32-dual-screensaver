@@ -118,9 +118,26 @@ struct ScreenData {
 
     std::vector<AntState> ants;
     std::vector<unsigned char> antGrid;
+    std::vector<unsigned char> cyclicNext;  // Cyclic CA double-buffer
     int antCols = 0;
     int antRows = 0;
     unsigned int currentAntColor;
+
+    // Boids velocities (positions reuse flowParticles)
+    std::vector<float> boidVX, boidVY;
+
+    // Pipes pipe-head tracking
+    std::vector<int>      pipeHeads;
+    std::vector<int>      pipeDirs;
+    std::vector<COLORREF> pipeColors;
+
+    // Mandelbrot zoom
+    double mandCX        = -0.74364990000; // zoom centre — real part
+    double mandCY        =  0.13182590000; // zoom centre — imaginary part
+    double mandScale     = 3.5;            // current view width in complex units
+    double mandPalOff    = 0.0;            // palette phase (slowly rotates colours)
+    int    mandTargetIdx = 0;              // index into curated target list
+    DWORD  mandLastTick  = 0;             // for frame-rate-independent zoom
 
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;

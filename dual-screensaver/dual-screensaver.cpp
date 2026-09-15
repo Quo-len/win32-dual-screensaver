@@ -45,7 +45,9 @@ static const WCHAR* g_modeNames[] = {
 	L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
 	L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
 	L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
-	L"Langton's Ant Symmetrical"
+	L"Langton's Ant Symmetrical",
+	L"Boids Flocking", L"Cyclic CA", L"Pipes", L"Brian's Brain",
+	L"Mandelbrot Zoom"
 };
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
@@ -54,7 +56,9 @@ static const RenderFn g_renderers[] = {
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
 	RenderPerlin, RenderFire, RenderMemoryDump,
-	RenderRandomSort, RenderLangton
+	RenderRandomSort, RenderLangton,
+	RenderBoids, RenderCyclicCA, RenderPipes, RenderBriansBrain,
+	RenderMandelbrot
 };
 
 #define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
@@ -159,7 +163,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
 		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15},
-		{L"ant", 16}
+		{L"ant", 16}, {L"boids", 17}, {L"cyclic", 18}, {L"pipes", 19},
+		{L"brain", 20}, {L"mandelbrot", 21}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
@@ -414,11 +419,12 @@ LRESULT CALLBACK PoolWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 		int startY = 48;
 		int rowH = 30;
 		int chkW = 175;
+		int half  = (NUM_SCREENSAVERS + 1) / 2; // split into two equal columns
 
 		for (int i = 0; i < NUM_SCREENSAVERS; i++)
 		{
-			int x = (i < 9) ? col1X : col2X;
-			int y = startY + ((i < 9) ? i : (i - 9)) * rowH;
+			int x = (i < half) ? col1X : col2X;
+			int y = startY + ((i < half) ? i : (i - half)) * rowH;
 
 			HWND hChk = CreateWindowW(L"BUTTON", g_modeNames[i],
 				WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
@@ -431,7 +437,7 @@ LRESULT CALLBACK PoolWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 			}
 		}
 
-		int btnY = startY + 9 * rowH + 15;
+		int btnY = startY + half * rowH + 15;
 		HWND hSelAll = CreateWindowW(L"BUTTON", L"Select All", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			25, btnY, 100, 30, hWnd, (HMENU)IDC_POOL_SELECT_ALL, hInst, NULL);
 		SendMessage(hSelAll, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
@@ -520,7 +526,7 @@ void ShowPoolWindow(HWND hWndParent, HINSTANCE hInstance)
 
 	HWND hWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"SaverPoolSettingsClass", L"Randomizer Pool Selection",
 		WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
-		CW_USEDEFAULT, CW_USEDEFAULT, 420, 475,
+		CW_USEDEFAULT, CW_USEDEFAULT, 420, 560,
 		hWndParent, nullptr, hInstance, nullptr);
 
 	MSG msg;

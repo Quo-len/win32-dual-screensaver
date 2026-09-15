@@ -1,6 +1,6 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 17 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 multi-monitor screensaver for Windows with 22 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
 
 ---
 
@@ -14,7 +14,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 17 p
 
 ---
 
-## Visual Modes (17 Built-in)
+## Visual Modes (22 Built-in)
 
 | #   | Mode                   | Description                                                               |
 | --- | ---------------------- | ------------------------------------------------------------------------- |
@@ -35,6 +35,11 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 17 p
 | 14  | **Hex Memory Dump**    | Cyberpunk-style animated memory buffer scanner                            |
 | 15  | **Sorting Algorithms** | Real-time step-by-step visualizations of classic sorting routines         |
 | 16  | **Langton's Ant**      | Multi-agent symmetrical cellular automata creating intricate tapestries   |
+| 17  | **Boids Flocking**     | 150 agents following separation, alignment & cohesion rules with trails   |
+| 18  | **Cyclic CA**          | 16-state cyclic cellular automaton producing perpetual spinning spirals   |
+| 19  | **Pipes**              | Classic pipes screensaver with Unicode box-drawing chars and vivid colors |
+| 20  | **Brian's Brain**      | 3-state CA with gliders that never stabilise — white sparks on black      |
+| 21  | **Mandelbrot Zoom**    | Infinite zoom into 8 curated targets with smooth coloring palette         |
 
 ---
 
@@ -128,7 +133,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`.
 
 ---
 

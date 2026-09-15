@@ -164,6 +164,11 @@
     <ClCompile Include="RenderPong.cpp" />
     <ClCompile Include="RenderRandomSort.cpp" />
     <ClCompile Include="RenderStars.cpp" />
+    <ClCompile Include="RenderBoids.cpp" />
+    <ClCompile Include="RenderCyclicCA.cpp" />
+    <ClCompile Include="RenderPipes.cpp" />
+    <ClCompile Include="RenderBriansBrain.cpp" />
+    <ClCompile Include="RenderMandelbrot.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="dual-screensaver.rc" />
