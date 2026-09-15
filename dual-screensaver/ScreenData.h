@@ -139,6 +139,14 @@ struct ScreenData {
     int    mandTargetIdx = 0;              // index into curated target list
     DWORD  mandLastTick  = 0;             // for frame-rate-independent zoom
 
+    // Clifford Attractor
+    double cliffordT = 0.0;
+    double cliffordX = 0.1;
+    double cliffordY = 0.1;
+    DWORD  cliffordLastTick = 0;
+
+
+
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;
     IDXGISwapChain* pSwapChain = nullptr;

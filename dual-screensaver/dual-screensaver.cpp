@@ -47,7 +47,7 @@ static const WCHAR* g_modeNames[] = {
 	L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
 	L"Langton's Ant Symmetrical",
 	L"Boids Flocking", L"Cyclic CA", L"Pipes", L"Brian's Brain",
-	L"Mandelbrot Zoom"
+	L"Mandelbrot Zoom", L"Clifford Attractor"
 };
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
@@ -58,7 +58,7 @@ static const RenderFn g_renderers[] = {
 	RenderPerlin, RenderFire, RenderMemoryDump,
 	RenderRandomSort, RenderLangton,
 	RenderBoids, RenderCyclicCA, RenderPipes, RenderBriansBrain,
-	RenderMandelbrot
+	RenderMandelbrot, RenderClifford
 };
 
 #define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
@@ -164,7 +164,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
 		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15},
 		{L"ant", 16}, {L"boids", 17}, {L"cyclic", 18}, {L"pipes", 19},
-		{L"brain", 20}, {L"mandelbrot", 21}
+		{L"brain", 20}, {L"mandelbrot", 21}, {L"clifford", 22}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);

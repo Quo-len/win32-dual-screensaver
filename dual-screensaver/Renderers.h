@@ -24,3 +24,4 @@ void RenderCyclicCA(HDC memDC, ScreenData* data, int width, int height, const RE
 void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderBriansBrain(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderMandelbrot(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

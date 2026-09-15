@@ -169,6 +169,7 @@
     <ClCompile Include="RenderPipes.cpp" />
     <ClCompile Include="RenderBriansBrain.cpp" />
     <ClCompile Include="RenderMandelbrot.cpp" />
+    <ClCompile Include="RenderClifford.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="dual-screensaver.rc" />
