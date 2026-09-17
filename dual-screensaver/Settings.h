@@ -27,7 +27,7 @@
 #define IDC_POOL_SELECT_ALL       1024
 #define IDC_POOL_DESELECT_ALL     1025
 #define IDC_POOL_CHECK_BASE       1100
-
+#define IDC_SETTINGS_BASE         1200
 extern float g_ASpeed;
 extern float g_BSpeed;
 extern float g_DonutSize;
@@ -37,6 +37,7 @@ extern int g_GolCellSize;
 extern int g_GolSpeed;
 extern float g_EarthSpeed;
 extern float g_PongSpeed;
+extern float g_DvdSpeed;
 extern float g_MazeBuildSpeed;
 extern float g_MazeSolveSpeed;
 extern float g_PerlinScale;
@@ -48,7 +49,7 @@ extern int g_ModeSecondary;
 extern int g_RandomMode;
 extern unsigned int g_RandomPool;
 extern const WCHAR* REG_PATH;
+extern const WCHAR* g_modeNames[];
 
 void LoadSettings();
 void SaveSettings();
-void ShowPoolWindow(HWND hWndParent, HINSTANCE hInstance);
