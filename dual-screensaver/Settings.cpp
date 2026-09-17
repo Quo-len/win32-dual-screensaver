@@ -16,6 +16,7 @@ float g_PerlinScale = DEFAULT_PERLINSCALE;
 float g_PerlinSpeed = DEFAULT_PERLINSPEED;
 int g_AntCount = DEFAULT_ANT_COUNT;
 int g_AntSpeed = DEFAULT_ANT_SPEED;
+int g_CurlCount = DEFAULT_CURL_COUNT;
 float g_DvdSpeed = DEFAULT_DVDSPEED;
 int g_ModePrimary = DEFAULT_MODEPRIMARY;
 int g_ModeSecondary = DEFAULT_MODESECONDARY;
@@ -67,6 +68,8 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"AntCount", NULL, NULL, (LPBYTE)&g_AntCount, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"AntSpeed", NULL, NULL, (LPBYTE)&g_AntSpeed, &size);
+		size = sizeof(int);
+		RegQueryValueExW(hKey, L"CurlCount", NULL, NULL, (LPBYTE)&g_CurlCount, &size);
 		size = sizeof(unsigned int);
 		if (RegQueryValueExW(hKey, L"RandomPool", NULL, NULL, (LPBYTE)&g_RandomPool, &size) != ERROR_SUCCESS) {
 			g_RandomPool = DEFAULT_RANDOM_POOL;
@@ -99,6 +102,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"RandomMode", 0, REG_DWORD, (const BYTE*)&g_RandomMode, sizeof(int));
 		RegSetValueExW(hKey, L"AntCount", 0, REG_DWORD, (const BYTE*)&g_AntCount, sizeof(int));
 		RegSetValueExW(hKey, L"AntSpeed", 0, REG_DWORD, (const BYTE*)&g_AntSpeed, sizeof(int));
+		RegSetValueExW(hKey, L"CurlCount", 0, REG_DWORD, (const BYTE*)&g_CurlCount, sizeof(int));
 		RegSetValueExW(hKey, L"RandomPool", 0, REG_DWORD, (const BYTE*)&g_RandomPool, sizeof(unsigned int));
 		RegCloseKey(hKey);
 	}

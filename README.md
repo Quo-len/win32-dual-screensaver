@@ -1,6 +1,6 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 22 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 multi-monitor screensaver for Windows with 24 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
 
 ---
 
@@ -14,32 +14,34 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 22 p
 
 ---
 
-## Visual Modes (22 Built-in)
+## Visual Modes (24 Built-in)
 
-| #   | Mode                   | Description                                                               |
-| --- | ---------------------- | ------------------------------------------------------------------------- |
-| 0   | **Donut**              | Rotating 3D ASCII torus rendered with real-time mathematical illumination |
-| 1   | **Game of Life**       | Conway's Cellular Automata with customizable cell sizes and speed         |
-| 2   | **Matrix**             | Iconic digital rain with glowing green glyphs and fading trails           |
-| 3   | **Earth**              | Real-time rotating ASCII globe rendered with true spherical projection    |
-| 4   | **Blank (Away)**       | Clean black screen showing a retro cowsay message with an away timer      |
-| 5   | **Julia Spirals**      | Smooth, dynamic fractal exploration rendered in real-time                 |
-| 6   | **3D Starfield**       | Warp-speed retro space travel with depth-projected stars                  |
-| 7   | **Bouncing DVD Logo**  | Classic bouncing logo that changes color on every wall collision          |
-| 8   | **Grid**               | Retro synthwave/cyberpunk perspective grid with flowing horizon           |
-| 9   | **Pong**               | Autonomous retro ping pong match with ball physics and paddle AI          |
-| 10  | **Maze Generator**     | Procedural labyrinth that generates in real-time and solves itself        |
-| 11  | **Odometer Clock**     | Minimalist mechanical flip/odometer-style digital clock                   |
-| 12  | **Perlin Flow Field**  | Fluid particle trajectories driven by 2D Perlin noise gradients           |
-| 13  | **ASCII Fire**         | Classic Doom-style fire simulation rendered with ASCII density glyphs     |
-| 14  | **Hex Memory Dump**    | Cyberpunk-style animated memory buffer scanner                            |
-| 15  | **Sorting Algorithms** | Real-time step-by-step visualizations of classic sorting routines         |
-| 16  | **Langton's Ant**      | Multi-agent symmetrical cellular automata creating intricate tapestries   |
-| 17  | **Boids Flocking**     | 150 agents following separation, alignment & cohesion rules with trails   |
-| 18  | **Cyclic CA**          | 16-state cyclic cellular automaton producing perpetual spinning spirals   |
-| 19  | **Pipes**              | Classic pipes screensaver with Unicode box-drawing chars and vivid colors |
-| 20  | **Brian's Brain**      | 3-state CA with gliders that never stabilise — white sparks on black      |
-| 21  | **Mandelbrot Zoom**    | Infinite zoom into 8 curated targets with smooth coloring palette         |
+| #   | Mode                     | Description                                                               |
+| --- | ------------------------ | ------------------------------------------------------------------------- |
+| 0   | **Donut**                | Rotating 3D ASCII torus rendered with real-time mathematical illumination |
+| 1   | **Game of Life**         | Conway's Cellular Automata with customizable cell sizes and speed         |
+| 2   | **Matrix**               | Iconic digital rain with glowing green glyphs and fading trails           |
+| 3   | **Earth**                | Real-time rotating ASCII globe rendered with true spherical projection    |
+| 4   | **Blank (Away)**         | Clean black screen showing a retro cowsay message with an away timer      |
+| 5   | **Julia Spirals**        | Smooth, dynamic fractal exploration rendered in real-time                 |
+| 6   | **3D Starfield**         | Warp-speed retro space travel with depth-projected stars                  |
+| 7   | **Bouncing DVD Logo**    | Classic bouncing logo that changes color on every wall collision          |
+| 8   | **Grid**                 | Retro synthwave/cyberpunk perspective grid with flowing horizon           |
+| 9   | **Pong**                 | Autonomous retro ping pong match with ball physics and paddle AI          |
+| 10  | **Maze Generator**       | Procedural labyrinth that generates in real-time and solves itself        |
+| 11  | **Odometer Clock**       | Minimalist mechanical flip/odometer-style digital clock                   |
+| 12  | **Perlin Flow Field**    | Fluid particle trajectories driven by 2D Perlin noise gradients           |
+| 13  | **ASCII Fire**           | Classic Doom-style fire simulation rendered with ASCII density glyphs     |
+| 14  | **Hex Memory Dump**      | Cyberpunk-style animated memory buffer scanner                            |
+| 15  | **Sorting Algorithms**   | Real-time step-by-step visualizations of classic sorting routines         |
+| 16  | **Langton's Ant**        | Multi-agent symmetrical cellular automata creating intricate tapestries   |
+| 17  | **Boids Flocking**       | 150 agents following separation, alignment & cohesion rules with trails   |
+| 18  | **Cyclic CA**            | 16-state cyclic cellular automaton producing perpetual spinning spirals   |
+| 19  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors |
+| 20  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black      |
+| 21  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette         |
+| 22  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing|
+| 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails   |
 
 ---
 
@@ -133,7 +135,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`.
 
 ---
 

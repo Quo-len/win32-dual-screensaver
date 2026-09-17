@@ -1,16 +1,16 @@
 #include "ConfigUI.h"
 #include "Settings.h"
+#include "Defaults.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 extern HINSTANCE hInst;
 
-#define NUM_SCREENSAVERS 22 // Currently 22 screensavers
+#define NUM_SCREENSAVERS 24 // Currently 24 screensavers
 
 #define IDAPPLY_MAIN 2200
-
-
 #define IDAPPLY_SUB 2300
+#define IDRESET_SUB 2301
 
 bool HasSettings(int id) {
 	switch (id) {
@@ -23,6 +23,7 @@ bool HasSettings(int id) {
 	case 11: return true; // Clock
 	case 12: return true; // Perlin
 	case 16: return true; // Langton's Ant
+	case 23: return true; // Curl Noise Particles
 	default: return false;
 	}
 }
@@ -91,11 +92,17 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			sprintf_s(buf, "%d", g_AntCount); createRow(L"Sets (Sym):", IDC_EDIT_ANT_COUNT, buf);
 			sprintf_s(buf, "%d", g_AntSpeed); createRow(L"Speed:", IDC_EDIT_ANT_SPEED, buf);
 			break;
+		case 23:
+			sprintf_s(buf, "%d", g_CurlCount); createRow(L"Particles:", IDC_EDIT_CURL_COUNT, buf);
+			break;
 		}
 
 		y += 10;
+		HWND hReset = CreateWindowW(L"BUTTON", L"Defaults", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+			20, y, 120, 35, hWnd, (HMENU)IDRESET_SUB, hInst, NULL);
 		HWND hApply = CreateWindowW(L"BUTTON", L"Apply", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-			100, y, 100, 35, hWnd, (HMENU)IDAPPLY_SUB, hInst, NULL);
+			155, y, 125, 35, hWnd, (HMENU)IDAPPLY_SUB, hInst, NULL);
+		SendMessage(hReset, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hApply, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
 		// Resize window to fit contents
@@ -139,6 +146,57 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			case 16:
 				getInt(IDC_EDIT_ANT_COUNT, g_AntCount); getInt(IDC_EDIT_ANT_SPEED, g_AntSpeed);
 				if (g_AntCount < 1) g_AntCount = 1;
+				if (g_AntSpeed < 1) g_AntSpeed = 1;
+				break;
+			case 23:
+				getInt(IDC_EDIT_CURL_COUNT, g_CurlCount);
+				if (g_CurlCount < 100) g_CurlCount = 100;
+				if (g_CurlCount > 500000) g_CurlCount = 500000;
+				break;
+			}
+			SaveSettings();
+		}
+		else if (LOWORD(wParam) == IDRESET_SUB)
+		{
+			int ss_id = (int)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+			char buf[32];
+			switch (ss_id) {
+			case 0:
+				g_ASpeed = DEFAULT_ASPEED; sprintf_s(buf, "%.3f", g_ASpeed); SetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf);
+				g_BSpeed = DEFAULT_BSPEED; sprintf_s(buf, "%.3f", g_BSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf);
+				g_DonutSize = DEFAULT_DONUTSIZE; sprintf_s(buf, "%.1f", g_DonutSize); SetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf);
+				g_DonutDistance = DEFAULT_DONUTDISTANCE; sprintf_s(buf, "%.1f", g_DonutDistance); SetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf);
+				break;
+			case 1:
+				g_GolCellSize = DEFAULT_GOLCELLSIZE; sprintf_s(buf, "%d", g_GolCellSize); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
+				g_GolSpeed = DEFAULT_GOLSPEED; sprintf_s(buf, "%d", g_GolSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
+				break;
+			case 3:
+				g_EarthSpeed = DEFAULT_EARTHSPEED; sprintf_s(buf, "%.3f", g_EarthSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
+				break;
+			case 7:
+				g_DvdSpeed = DEFAULT_DVDSPEED; sprintf_s(buf, "%.1f", g_DvdSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_DVD_SPEED, buf);
+				break;
+			case 9:
+				g_PongSpeed = DEFAULT_PONGSPEED; sprintf_s(buf, "%.1f", g_PongSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
+				break;
+			case 10:
+				g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED; sprintf_s(buf, "%.1f", g_MazeBuildSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
+				g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED; sprintf_s(buf, "%.1f", g_MazeSolveSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
+				break;
+			case 11:
+				g_TextSize = DEFAULT_TEXTSIZE; sprintf_s(buf, "%d", g_TextSize); SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
+				break;
+			case 12:
+				g_PerlinScale = DEFAULT_PERLINSCALE; sprintf_s(buf, "%.4f", g_PerlinScale); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
+				g_PerlinSpeed = DEFAULT_PERLINSPEED; sprintf_s(buf, "%.2f", g_PerlinSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SPEED, buf);
+				break;
+			case 16:
+				g_AntCount = DEFAULT_ANT_COUNT; sprintf_s(buf, "%d", g_AntCount); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf);
+				g_AntSpeed = DEFAULT_ANT_SPEED; sprintf_s(buf, "%d", g_AntSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf);
+				break;
+			case 23:
+				g_CurlCount = DEFAULT_CURL_COUNT; sprintf_s(buf, "%d", g_CurlCount); SetDlgItemTextA(hWnd, IDC_EDIT_CURL_COUNT, buf);
 				break;
 			}
 			SaveSettings();
@@ -226,11 +284,28 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		SendMessage(hC1, CB_SETCURSEL, g_ModePrimary, 0);
 		SendMessage(hC2, CB_SETCURSEL, g_ModeSecondary, 0);
 
-		optionsY += 60;
+		optionsY += 50;
+
+		const int clientW = 700;
+		const int btnApplyW = 160;
+		const int btnApplyH = 40;
+		int btnApplyX = (clientW - btnApplyW) / 2;
 
 		HWND hApply = CreateWindowW(L"BUTTON", L"Apply", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-			250, optionsY, 150, 40, hWnd, (HMENU)IDAPPLY_MAIN, hInst, NULL);
+			btnApplyX, optionsY, btnApplyW, btnApplyH, hWnd, (HMENU)IDAPPLY_MAIN, hInst, NULL);
 		SendMessage(hApply, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+
+		// Auto-size and center the window so all controls and Apply button are completely visible with bottom padding
+		int clientH = optionsY + btnApplyH + 25;
+		RECT rc = { 0, 0, clientW, clientH };
+		AdjustWindowRectEx(&rc, WS_VISIBLE | WS_SYSMENU | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
+		int winW = rc.right - rc.left;
+		int winH = rc.bottom - rc.top;
+		int screenW = GetSystemMetrics(SM_CXSCREEN);
+		int screenH = GetSystemMetrics(SM_CYSCREEN);
+		int posX = (screenW - winW) / 2;
+		int posY = (screenH - winH) / 2;
+		SetWindowPos(hWnd, NULL, (posX > 0 ? posX : 0), (posY > 0 ? posY : 0), winW, winH, SWP_NOZORDER);
 
 		break;
 	}
