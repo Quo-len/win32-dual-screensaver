@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -78,6 +78,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -91,6 +92,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -106,6 +108,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -119,6 +122,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -138,7 +142,7 @@
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Perlin.h" />
-    <ClInclude Include="Renderers.h" />
+    <ClInclude Include="renderers\Renderers.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="ScreenData.h" />
     <ClInclude Include="Settings.h" />
@@ -147,29 +151,29 @@
   <ItemGroup>
     <ClCompile Include="dual-screensaver.cpp" />
     <ClCompile Include="Perlin.cpp" />
-    <ClCompile Include="RenderBlank.cpp" />
-    <ClCompile Include="RenderClock.cpp" />
-    <ClCompile Include="RenderDonut.cpp" />
-    <ClCompile Include="RenderDVD.cpp" />
-    <ClCompile Include="RenderEarth.cpp" />
-    <ClCompile Include="RenderFire.cpp" />
-    <ClCompile Include="RenderGoL.cpp" />
-    <ClCompile Include="RenderGrid.cpp" />
-    <ClCompile Include="RenderJulia.cpp" />
-    <ClCompile Include="RenderLangton.cpp" />
-    <ClCompile Include="RenderMatrix.cpp" />
-    <ClCompile Include="RenderMaze.cpp" />
-    <ClCompile Include="RenderMemoryDump.cpp" />
-    <ClCompile Include="RenderPerlin.cpp" />
-    <ClCompile Include="RenderPong.cpp" />
-    <ClCompile Include="RenderRandomSort.cpp" />
-    <ClCompile Include="RenderStars.cpp" />
-    <ClCompile Include="RenderBoids.cpp" />
-    <ClCompile Include="RenderCyclicCA.cpp" />
-    <ClCompile Include="RenderPipes.cpp" />
-    <ClCompile Include="RenderBriansBrain.cpp" />
-    <ClCompile Include="RenderMandelbrot.cpp" />
-    <ClCompile Include="RenderClifford.cpp" />
+    <ClCompile Include="renderers\RenderBlank.cpp" />
+    <ClCompile Include="renderers\RenderClock.cpp" />
+    <ClCompile Include="renderers\RenderDonut.cpp" />
+    <ClCompile Include="renderers\RenderDVD.cpp" />
+    <ClCompile Include="renderers\RenderEarth.cpp" />
+    <ClCompile Include="renderers\RenderFire.cpp" />
+    <ClCompile Include="renderers\RenderGoL.cpp" />
+    <ClCompile Include="renderers\RenderGrid.cpp" />
+    <ClCompile Include="renderers\RenderJulia.cpp" />
+    <ClCompile Include="renderers\RenderLangton.cpp" />
+    <ClCompile Include="renderers\RenderMatrix.cpp" />
+    <ClCompile Include="renderers\RenderMaze.cpp" />
+    <ClCompile Include="renderers\RenderMemoryDump.cpp" />
+    <ClCompile Include="renderers\RenderPerlin.cpp" />
+    <ClCompile Include="renderers\RenderPong.cpp" />
+    <ClCompile Include="renderers\RenderRandomSort.cpp" />
+    <ClCompile Include="renderers\RenderStars.cpp" />
+    <ClCompile Include="renderers\RenderBoids.cpp" />
+    <ClCompile Include="renderers\RenderCyclicCA.cpp" />
+    <ClCompile Include="renderers\RenderPipes.cpp" />
+    <ClCompile Include="renderers\RenderBriansBrain.cpp" />
+    <ClCompile Include="renderers\RenderMandelbrot.cpp" />
+    <ClCompile Include="renderers\RenderClifford.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="ConfigUI.cpp" />
   </ItemGroup>
@@ -187,3 +191,4 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+

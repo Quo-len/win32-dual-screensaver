@@ -36,7 +36,7 @@
     <ClInclude Include="Perlin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderers.h">
+    <ClInclude Include="renderers\Renderers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Defaults.h">
@@ -50,55 +50,55 @@
     <ClCompile Include="Perlin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderDonut.cpp">
+    <ClCompile Include="renderers\RenderDonut.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderGoL.cpp">
+    <ClCompile Include="renderers\RenderGoL.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderMatrix.cpp">
+    <ClCompile Include="renderers\RenderMatrix.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderEarth.cpp">
+    <ClCompile Include="renderers\RenderEarth.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderFire.cpp">
+    <ClCompile Include="renderers\RenderFire.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderBlank.cpp">
+    <ClCompile Include="renderers\RenderBlank.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderJulia.cpp">
+    <ClCompile Include="renderers\RenderJulia.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderStars.cpp">
+    <ClCompile Include="renderers\RenderStars.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderDVD.cpp">
+    <ClCompile Include="renderers\RenderDVD.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderGrid.cpp">
+    <ClCompile Include="renderers\RenderGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPong.cpp">
+    <ClCompile Include="renderers\RenderPong.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderMaze.cpp">
+    <ClCompile Include="renderers\RenderMaze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderClock.cpp">
+    <ClCompile Include="renderers\RenderClock.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPerlin.cpp">
+    <ClCompile Include="renderers\RenderPerlin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderMemoryDump.cpp">
+    <ClCompile Include="renderers\RenderMemoryDump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderRandomSort.cpp">
+    <ClCompile Include="renderers\RenderRandomSort.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderLangton.cpp">
+    <ClCompile Include="renderers\RenderLangton.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
