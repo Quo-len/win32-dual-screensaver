@@ -6,7 +6,7 @@
 
 extern HINSTANCE hInst;
 
-#define NUM_SCREENSAVERS 24 // Currently 24 screensavers
+#define NUM_SCREENSAVERS 26 // Currently 26 screensavers
 
 #define IDAPPLY_MAIN 2200
 #define IDAPPLY_SUB 2300

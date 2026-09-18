@@ -1,6 +1,6 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 24 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 multi-monitor screensaver for Windows with 25 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
 
 ---
 
@@ -14,7 +14,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 24 p
 
 ---
 
-## Visual Modes (24 Built-in)
+## Visual Modes (26 Built-in)
 
 | #   | Mode                     | Description                                                               |
 | --- | ------------------------ | ------------------------------------------------------------------------- |
@@ -42,6 +42,8 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 24 p
 | 21  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette         |
 | 22  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing|
 | 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails   |
+| 24  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow|
+| 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression         |
 
 ---
 
@@ -135,7 +137,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`.
 
 ---
 

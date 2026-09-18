@@ -1,0 +1,238 @@
+#include "Renderers.h"
+#include <vector>
+#include <string>
+#include <fstream>
+#include <algorithm>
+
+#pragma pack(push, 1)
+struct BapHeader {
+    char     magic[4];       // "BAP1"
+    uint32_t totalFrames;
+    uint16_t width;
+    uint16_t height;
+    uint16_t fps;
+    uint16_t levels;
+    uint32_t dataOffset;
+    uint8_t  reserved[12];
+};
+#pragma pack(pop)
+
+// 16-level ASCII density ramp
+static const char ASCII_RAMP[16] = {
+    ' ', ' ', '.', ':', '-', '=', '+', '*',
+    'o', 'a', '#', '%', '&', '8', '$', '@'
+};
+
+static std::wstring GetModuleDir() {
+    wchar_t path[MAX_PATH] = { 0 };
+    GetModuleFileNameW(NULL, path, MAX_PATH);
+    wchar_t* lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash) {
+        *lastSlash = L'\0';
+    }
+    return std::wstring(path);
+}
+
+static bool TryLoadBapFile(const std::wstring& filePath, ScreenData* data) {
+    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        return false;
+    }
+
+    std::streamsize fileSize = file.tellg();
+    if (fileSize < (std::streamsize)sizeof(BapHeader)) {
+        return false;
+    }
+
+    file.seekg(0, std::ios::beg);
+
+    BapHeader header;
+    file.read(reinterpret_cast<char*>(&header), sizeof(BapHeader));
+    if (memcmp(header.magic, "BAP1", 4) != 0 || header.totalFrames == 0 ||
+        header.width == 0 || header.height == 0 || header.fps == 0) {
+        return false;
+    }
+
+    data->badAppleTotalFrames = header.totalFrames;
+    data->badAppleWidth = header.width;
+    data->badAppleHeight = header.height;
+    data->badAppleFPS = header.fps;
+    data->badAppleLevels = header.levels > 0 ? header.levels : 16;
+    data->badAppleDataOffset = header.dataOffset;
+
+    // Read offsets table
+    data->badAppleOffsets.resize(header.totalFrames);
+    file.read(reinterpret_cast<char*>(data->badAppleOffsets.data()), header.totalFrames * sizeof(uint32_t));
+
+    // Read RLE data
+    std::streamsize rleSize = fileSize - file.tellg();
+    if (rleSize <= 0) {
+        return false;
+    }
+
+    data->badAppleRleData.resize((size_t)rleSize);
+    file.read(reinterpret_cast<char*>(data->badAppleRleData.data()), rleSize);
+
+    // Allocate frame decode buffer
+    data->badAppleFrameBuffer.assign((size_t)header.width * header.height, 0);
+
+    data->badAppleStartTime = GetTickCount();
+    data->badAppleLoaded = true;
+    return true;
+}
+
+static void LoadBadAppleData(ScreenData* data) {
+    if (data->badAppleLoadAttempted) return;
+    data->badAppleLoadAttempted = true;
+
+    std::wstring modDir = GetModuleDir();
+    std::vector<std::wstring> searchCandidates = {
+        modDir + L"\\bad_apple.bin",
+        modDir + L"\\..\\bad_apple.bin",
+        modDir + L"\\..\\..\\bad_apple.bin",
+        modDir + L"\\..\\..\\scripts\\bad_apple.bin",
+        modDir + L"\\scripts\\bad_apple.bin",
+        modDir + L"\\..\\..\\temporary-script\\bad_apple.bin",
+        modDir + L"\\temporary-script\\bad_apple.bin",
+        L"bad_apple.bin",
+        L"scripts\\bad_apple.bin",
+        L"..\\scripts\\bad_apple.bin",
+        L"temporary-script\\bad_apple.bin",
+        L"..\\temporary-script\\bad_apple.bin"
+    };
+
+    for (const auto& candidate : searchCandidates) {
+        if (TryLoadBapFile(candidate, data)) {
+            break;
+        }
+    }
+}
+
+void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    // Fill entire screen with solid black
+    HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    FillRect(memDC, &rect, blackBrush);
+
+    if (!data->badAppleLoaded) {
+        LoadBadAppleData(data);
+    }
+
+    if (!data->badAppleLoaded) {
+        // Display graceful error/setup message
+        SetBkMode(memDC, TRANSPARENT);
+        SetTextColor(memDC, RGB(220, 50, 50));
+        HFONT hErrFont = CreateFontW(22, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+            ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ oldFont = SelectObject(memDC, hErrFont);
+
+        RECT r = rect;
+        r.top += height / 3;
+        DrawTextW(memDC,
+            L"[ Bad Apple ASCII Screensaver ]\n\n"
+            L"Could not locate 'bad_apple.bin'.\n"
+            L"Please run: python scripts\\convert_video.py\n"
+            L"to generate and deploy the video data file.",
+            -1, &r, DT_CENTER | DT_WORDBREAK);
+
+        SelectObject(memDC, oldFont);
+        DeleteObject(hErrFont);
+        return;
+    }
+
+    int cols = data->badAppleWidth;
+    int rows = data->badAppleHeight;
+    if (cols <= 0 || rows <= 0 || data->badAppleTotalFrames <= 0) return;
+
+    // Advance frame based on elapsed time and framerate (seamless looping)
+    DWORD now = GetTickCount();
+    if (data->badAppleStartTime == 0) {
+        data->badAppleStartTime = now;
+    }
+    DWORD elapsed = now - data->badAppleStartTime;
+    int frameIdx = (int)(((uint64_t)elapsed * (uint64_t)data->badAppleFPS) / 1000ULL) % data->badAppleTotalFrames;
+
+    // Decode RLE frame
+    uint32_t offset = data->badAppleOffsets[frameIdx];
+    if (offset < data->badAppleRleData.size()) {
+        const uint8_t* ptr = data->badAppleRleData.data() + offset;
+        const uint8_t* endPtr = data->badAppleRleData.data() + data->badAppleRleData.size();
+        uint8_t* dst = data->badAppleFrameBuffer.data();
+        int target = cols * rows;
+        int decoded = 0;
+
+        while (decoded < target && ptr + 1 < endPtr) {
+            uint8_t count = *ptr++;
+            uint8_t val = *ptr++;
+            int toFill = (std::min)((int)count, target - decoded);
+            memset(dst + decoded, val, toFill);
+            decoded += toFill;
+        }
+    }
+
+    // Determine font size to fit display nicely
+    // Monospace fonts have roughly width = height * 0.58
+    int maxFontHByScreenH = height / (rows + 1);
+    int maxFontHByScreenW = (int)(width / (cols * 0.58f));
+    int fontH = (std::max)(4, (std::min)(maxFontHByScreenH, maxFontHByScreenW));
+
+    if (!data->badAppleFont || data->badAppleFontHeight != fontH) {
+        if (data->badAppleFont) {
+            DeleteObject(data->badAppleFont);
+        }
+        data->badAppleFont = CreateFontW(
+            fontH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, L"Consolas"
+        );
+        data->badAppleFontHeight = fontH;
+    }
+
+    HGDIOBJ oldFont = SelectObject(memDC, data->badAppleFont);
+
+    TEXTMETRICW tm;
+    GetTextMetricsW(memDC, &tm);
+    int charW = tm.tmAveCharWidth;
+    int charH = tm.tmHeight;
+
+    // Ensure it strictly fits within the window boundaries
+    while ((charW * cols > width || charH * rows > height) && fontH > 3) {
+        fontH--;
+        SelectObject(memDC, oldFont);
+        DeleteObject(data->badAppleFont);
+        data->badAppleFont = CreateFontW(
+            fontH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, L"Consolas"
+        );
+        data->badAppleFontHeight = fontH;
+        oldFont = SelectObject(memDC, data->badAppleFont);
+        GetTextMetricsW(memDC, &tm);
+        charW = tm.tmAveCharWidth;
+        charH = tm.tmHeight;
+    }
+
+    int totalW = charW * cols;
+    int totalH = charH * rows;
+    int startX = (std::max)(0, (width - totalW) / 2);
+    int startY = (std::max)(0, (height - totalH) / 2);
+
+    SetBkMode(memDC, OPAQUE);
+    SetBkColor(memDC, RGB(0, 0, 0));
+    SetTextColor(memDC, RGB(235, 235, 235));
+
+    std::vector<char> lineBuf(cols + 1, ' ');
+    const uint8_t* frameBuf = data->badAppleFrameBuffer.data();
+
+    for (int y = 0; y < rows; ++y) {
+        const uint8_t* rowSrc = frameBuf + (y * cols);
+        for (int x = 0; x < cols; ++x) {
+            uint8_t val = rowSrc[x];
+            if (val >= 16) val = 15;
+            lineBuf[x] = ASCII_RAMP[val];
+        }
+        TextOutA(memDC, startX, startY + y * charH, lineBuf.data(), cols);
+    }
+
+    SelectObject(memDC, oldFont);
+}

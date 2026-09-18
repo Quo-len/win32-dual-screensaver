@@ -9,6 +9,13 @@ struct IDXGISwapChain;
 struct ID3D11Texture2D;
 struct IDXGISurface1;
 
+struct HarmoPendulum {
+    double amp;   // amplitude (normalized)
+    double freq;  // angular frequency (rad per curve-unit)
+    double phase; // initial phase offset
+    double damp;  // damping (0 = no decay)
+};
+
 struct MazeCell {
     bool visited;
     bool wallTop, wallRight, wallBottom, wallLeft;
@@ -145,7 +152,29 @@ struct ScreenData {
     double cliffordY = 0.1;
     DWORD  cliffordLastTick = 0;
 
+    // Triple-Pendulum Harmonograph
+    HarmoPendulum harmoP[3];           // the three pendulums
+    double harmoT       = 0.0;         // current curve parameter
+    double harmoGlobalT = 0.0;         // global time for respawn logic
+    double harmoColorT  = 0.0;         // slow hue-cycle accumulator
+    DWORD  harmoLastTick = 0;
+    bool   harmoInitialized = false;
 
+    // Bad Apple ASCII Player
+    bool badAppleLoaded = false;
+    bool badAppleLoadAttempted = false;
+    DWORD badAppleStartTime = 0;
+    int badAppleTotalFrames = 0;
+    int badAppleWidth = 0;
+    int badAppleHeight = 0;
+    int badAppleFPS = 30;
+    int badAppleLevels = 16;
+    uint32_t badAppleDataOffset = 0;
+    std::vector<uint32_t> badAppleOffsets;
+    std::vector<uint8_t> badAppleRleData;
+    std::vector<uint8_t> badAppleFrameBuffer;
+    HFONT badAppleFont = nullptr;
+    int badAppleFontHeight = 0;
 
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;
