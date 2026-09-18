@@ -12,6 +12,7 @@
 #define IDI_SMALL                       108
 #define IDC_DUALSCREENSAVER             109
 #define IDR_MAINFRAME                   128
+#define IDR_BAD_APPLE_BIN               130
 #define IDC_STATIC                      -1
 
 // Next default values for new objects

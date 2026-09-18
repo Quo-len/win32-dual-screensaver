@@ -179,6 +179,8 @@
     <ClCompile Include="renderers\RenderCurlNoise.cpp" />
     <ClCompile Include="renderers\RenderHarmonograph.cpp" />
     <ClCompile Include="renderers\RenderBadApple.cpp" />
+    <ClCompile Include="renderers\RenderASCIIQuarium.cpp" />
+    <ClCompile Include="renderers\RenderBonsai.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="ConfigUI.cpp" />
   </ItemGroup>

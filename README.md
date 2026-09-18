@@ -14,7 +14,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 
 ---
 
-## Visual Modes (26 Built-in)
+## Visual Modes (28 Built-in)
 
 | #   | Mode                     | Description                                                               |
 | --- | ------------------------ | ------------------------------------------------------------------------- |
@@ -44,6 +44,8 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 | 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails   |
 | 24  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow|
 | 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression         |
+| 26  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp |
+| 27  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes    |
 
 ---
 
@@ -69,10 +71,10 @@ Run PowerShell **as Administrator** and execute:
 
 ```powershell
 # Copy and rename the executable to .scr in System32
-Copy-Item ".\x64\Release\DualScreenSaver.exe" "C:\Windows\System32\DualScreenSaver.scr" -Force
+Copy-Item ".\dual-screensaver\x64\Release\DualScreenSaver.exe" "C:\Windows\System32\DualScreenSaver.scr" -Force
 ```
 
-_(If building Debug, use `.\x64\Debug\DualScreenSaver-Debug.exe`)_.
+_(If building Debug, use `.\dual-screensaver\x64\Debug\DualScreenSaver-Debug.exe`)_.
 
 ### Step 3: Select in Windows
 
@@ -137,7 +139,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`.
 
 ---
 

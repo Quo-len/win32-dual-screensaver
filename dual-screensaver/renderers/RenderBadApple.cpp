@@ -1,4 +1,5 @@
 #include "Renderers.h"
+#include "resource.h"
 #include <vector>
 #include <string>
 #include <fstream>
@@ -33,6 +34,60 @@ static std::wstring GetModuleDir() {
     return std::wstring(path);
 }
 
+static bool TryLoadBapData(const uint8_t* pData, size_t dataSize, ScreenData* data) {
+    if (dataSize < sizeof(BapHeader)) {
+        return false;
+    }
+
+    const BapHeader* header = reinterpret_cast<const BapHeader*>(pData);
+    if (memcmp(header->magic, "BAP1", 4) != 0 || header->totalFrames == 0 ||
+        header->width == 0 || header->height == 0 || header->fps == 0) {
+        return false;
+    }
+
+    size_t offsetsByteSize = (size_t)header->totalFrames * sizeof(uint32_t);
+    size_t minExpected = sizeof(BapHeader) + offsetsByteSize;
+    if (dataSize < minExpected) {
+        return false;
+    }
+
+    data->badAppleTotalFrames = header->totalFrames;
+    data->badAppleWidth = header->width;
+    data->badAppleHeight = header->height;
+    data->badAppleFPS = header->fps;
+    data->badAppleLevels = header->levels > 0 ? header->levels : 16;
+    data->badAppleDataOffset = header->dataOffset;
+
+    // Read offsets table
+    data->badAppleOffsets.resize(header->totalFrames);
+    memcpy(data->badAppleOffsets.data(), pData + sizeof(BapHeader), offsetsByteSize);
+
+    // Read RLE data
+    size_t rleSize = dataSize - minExpected;
+    data->badAppleRleData.resize(rleSize);
+    if (rleSize > 0) {
+        memcpy(data->badAppleRleData.data(), pData + minExpected, rleSize);
+    }
+
+    // Allocate frame decode buffer
+    data->badAppleFrameBuffer.assign((size_t)header->width * header->height, 0);
+
+    data->badAppleStartTime = GetTickCount();
+    data->badAppleLoaded = true;
+    return true;
+}
+
+static bool TryLoadFromResource(ScreenData* data) {
+    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BAD_APPLE_BIN), RT_RCDATA);
+    if (!hRes) return false;
+    HGLOBAL hMem = LoadResource(NULL, hRes);
+    if (!hMem) return false;
+    DWORD size = SizeofResource(NULL, hRes);
+    const void* ptr = LockResource(hMem);
+    if (!ptr || size == 0) return false;
+    return TryLoadBapData(reinterpret_cast<const uint8_t*>(ptr), (size_t)size, data);
+}
+
 static bool TryLoadBapFile(const std::wstring& filePath, ScreenData* data) {
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
@@ -45,60 +100,37 @@ static bool TryLoadBapFile(const std::wstring& filePath, ScreenData* data) {
     }
 
     file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> buffer((size_t)fileSize);
+    file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
 
-    BapHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(BapHeader));
-    if (memcmp(header.magic, "BAP1", 4) != 0 || header.totalFrames == 0 ||
-        header.width == 0 || header.height == 0 || header.fps == 0) {
-        return false;
-    }
-
-    data->badAppleTotalFrames = header.totalFrames;
-    data->badAppleWidth = header.width;
-    data->badAppleHeight = header.height;
-    data->badAppleFPS = header.fps;
-    data->badAppleLevels = header.levels > 0 ? header.levels : 16;
-    data->badAppleDataOffset = header.dataOffset;
-
-    // Read offsets table
-    data->badAppleOffsets.resize(header.totalFrames);
-    file.read(reinterpret_cast<char*>(data->badAppleOffsets.data()), header.totalFrames * sizeof(uint32_t));
-
-    // Read RLE data
-    std::streamsize rleSize = fileSize - file.tellg();
-    if (rleSize <= 0) {
-        return false;
-    }
-
-    data->badAppleRleData.resize((size_t)rleSize);
-    file.read(reinterpret_cast<char*>(data->badAppleRleData.data()), rleSize);
-
-    // Allocate frame decode buffer
-    data->badAppleFrameBuffer.assign((size_t)header.width * header.height, 0);
-
-    data->badAppleStartTime = GetTickCount();
-    data->badAppleLoaded = true;
-    return true;
+    return TryLoadBapData(buffer.data(), buffer.size(), data);
 }
 
 static void LoadBadAppleData(ScreenData* data) {
     if (data->badAppleLoadAttempted) return;
     data->badAppleLoadAttempted = true;
 
+    // 1. Check if external bad_apple.bin exists right next to the executable (allows custom video overrides)
     std::wstring modDir = GetModuleDir();
+    std::wstring directPath = modDir + L"\\bad_apple.bin";
+    if (TryLoadBapFile(directPath, data)) {
+        return;
+    }
+
+    // 2. Load embedded resource directly inside .exe (fully self-contained screensaver)
+    if (TryLoadFromResource(data)) {
+        return;
+    }
+
+    // 3. Fallback to developer script paths
     std::vector<std::wstring> searchCandidates = {
-        modDir + L"\\bad_apple.bin",
         modDir + L"\\..\\bad_apple.bin",
         modDir + L"\\..\\..\\bad_apple.bin",
         modDir + L"\\..\\..\\scripts\\bad_apple.bin",
         modDir + L"\\scripts\\bad_apple.bin",
-        modDir + L"\\..\\..\\temporary-script\\bad_apple.bin",
-        modDir + L"\\temporary-script\\bad_apple.bin",
         L"bad_apple.bin",
         L"scripts\\bad_apple.bin",
-        L"..\\scripts\\bad_apple.bin",
-        L"temporary-script\\bad_apple.bin",
-        L"..\\temporary-script\\bad_apple.bin"
+        L"..\\scripts\\bad_apple.bin"
     };
 
     for (const auto& candidate : searchCandidates) {

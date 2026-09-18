@@ -122,6 +122,18 @@
     <ClCompile Include="renderers\RenderCurlNoise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="renderers\RenderHarmonograph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="renderers\RenderBadApple.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="renderers\RenderASCIIQuarium.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="renderers\RenderBonsai.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Settings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

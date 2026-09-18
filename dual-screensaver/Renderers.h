@@ -28,3 +28,5 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
 void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

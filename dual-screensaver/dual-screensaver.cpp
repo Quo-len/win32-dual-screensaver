@@ -25,7 +25,8 @@ const WCHAR* g_modeNames[] = {
 	L"Langton's Ant Symmetrical",
 	L"Boids Flocking", L"Cyclic CA", L"Pipes", L"Brian's Brain",
 	L"Mandelbrot Zoom", L"Clifford Attractor", L"Curl Noise Particles",
-	L"Harmonograph", L"Bad Apple (ASCII)"
+	L"Harmonograph", L"Bad Apple (ASCII)", L"ASCIIQuarium",
+	L"cbonsai (Bonsai Tree)"
 };
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
@@ -37,7 +38,8 @@ static const RenderFn g_renderers[] = {
 	RenderRandomSort, RenderLangton,
 	RenderBoids, RenderCyclicCA, RenderPipes, RenderBriansBrain,
 	RenderMandelbrot, RenderClifford, RenderCurlNoise,
-	RenderHarmonograph, RenderBadApple
+	RenderHarmonograph, RenderBadApple, RenderASCIIQuarium,
+	RenderBonsai
 };
 
 #define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
@@ -64,7 +66,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"ant", 16}, {L"boids", 17}, {L"cyclic", 18}, {L"pipes", 19},
 		{L"brain", 20}, {L"mandelbrot", 21}, {L"clifford", 22}, {L"curl", 23},
 		{L"harmonograph", 24}, {L"harmo", 24},
-		{L"badapple", 25}, {L"bad-apple", 25}, {L"apple", 25}, {L"ascii", 25}
+		{L"badapple", 25}, {L"bad-apple", 25}, {L"apple", 25}, {L"ascii", 25},
+		{L"asciiquarium", 26}, {L"aquarium", 26}, {L"fish", 26},
+		{L"cbonsai", 27}, {L"bonsai", 27}, {L"tree", 27}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);

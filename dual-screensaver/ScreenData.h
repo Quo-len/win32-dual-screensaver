@@ -176,6 +176,89 @@ struct ScreenData {
     HFONT badAppleFont = nullptr;
     int badAppleFontHeight = 0;
 
+    // ASCIIQuarium
+    struct AquaFish {
+        float x, y;
+        float vx;
+        int type;
+        COLORREF color;
+        int animFrame;
+    };
+    struct AquaBubble {
+        float x, y;
+        float speed;
+        float swaySpeed;
+        float swayPhase;
+        int type;
+    };
+    struct AquaSeaweed {
+        int x;
+        int height;
+        float phase;
+        COLORREF color;
+    };
+    struct AquaJellyfish {
+        float x, y;
+        float vy;
+        float pulsePhase;
+        COLORREF color;
+    };
+    struct AquaCrab {
+        float x;
+        int y;
+        float vx;
+        int animFrame;
+    };
+    struct AquaDuck {
+        float x;
+        float vx;
+        bool active;
+    };
+
+    bool aquaInitialized = false;
+    DWORD aquaLastTick = 0;
+    int aquaWidthInChars = 0;
+    int aquaHeightInChars = 0;
+    std::vector<AquaFish> aquaFish;
+    std::vector<AquaBubble> aquaBubbles;
+    std::vector<AquaSeaweed> aquaSeaweed;
+    std::vector<AquaJellyfish> aquaJelly;
+    AquaCrab aquaCrab = { 10.0f, 0, 0.4f, 0 };
+    AquaDuck aquaDuck = { -20.0f, 0.2f, false };
+
+    // cbonsai (Procedural Bonsai Trees)
+    struct BonsaiCell {
+        char ch = ' ';
+        COLORREF color = 0;
+    };
+    struct BonsaiShoot {
+        float x, y;
+        float dx, dy;
+        int age;
+        int maxAge;
+        int generation;
+        int thickness;
+    };
+    struct BonsaiPetal {
+        float x, y;
+        float vx, vy;
+        float phase;
+        char ch;
+        COLORREF color;
+    };
+
+    bool bonsaiInitialized = false;
+    DWORD bonsaiLastTick = 0;
+    int bonsaiWidthInChars = 0;
+    int bonsaiHeightInChars = 0;
+    int bonsaiState = 0; // 0: growing, 1: mature/petals, 2: renew
+    DWORD bonsaiStateStartTime = 0;
+    int bonsaiTheme = 0; // 0: Spring, 1: Sakura, 2: Autumn, 3: Ginkgo
+    std::vector<BonsaiCell> bonsaiGrid;
+    std::vector<BonsaiShoot> bonsaiActiveShoots;
+    std::vector<BonsaiPetal> bonsaiPetals;
+    std::vector<POINT> bonsaiLeaves;
+
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;
     IDXGISwapChain* pSwapChain = nullptr;
