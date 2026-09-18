@@ -199,9 +199,13 @@ struct ScreenData {
     };
     struct AquaJellyfish {
         float x, y;
+        float baseX;
         float vy;
         float pulsePhase;
         COLORREF color;
+        int state;        // 0 = swimming up, 1 = descending
+        float topLimit;   // target row near surface before turning back down
+        float swayOffset;
     };
     struct AquaCrab {
         float x;
@@ -209,10 +213,12 @@ struct ScreenData {
         float vx;
         int animFrame;
     };
-    struct AquaDuck {
+    struct AquaSurfaceEntity {
         float x;
         float vx;
         bool active;
+        int type; // 0 = Duck, 1 = Sailing Ship, 2 = Whale
+        float animTimer;
     };
 
     bool aquaInitialized = false;
@@ -224,7 +230,7 @@ struct ScreenData {
     std::vector<AquaSeaweed> aquaSeaweed;
     std::vector<AquaJellyfish> aquaJelly;
     AquaCrab aquaCrab = { 10.0f, 0, 0.4f, 0 };
-    AquaDuck aquaDuck = { -20.0f, 0.2f, false };
+    AquaSurfaceEntity aquaSurface = { -15.0f, 0.25f, true, 0, 0.0f };
 
     // cbonsai (Procedural Bonsai Trees)
     struct BonsaiCell {

@@ -13,10 +13,17 @@ static const COLORREF COL_WAVE_TOP = RGB(190, 235, 255);
 static const COLORREF COL_SAND1    = RGB(185, 155, 95);
 static const COLORREF COL_SAND2    = RGB(140, 115, 65);
 static const COLORREF COL_BUBBLE   = RGB(180, 235, 255);
-static const COLORREF COL_DUCK     = RGB(255, 220, 50);
-static const COLORREF COL_BEAK     = RGB(255, 130, 0);
-static const COLORREF COL_CRAB     = RGB(245, 80, 60);
-static const COLORREF COL_CRAB_EYE = RGB(255, 255, 255);
+static const COLORREF COL_DUCK        = RGB(255, 220, 50);
+static const COLORREF COL_BEAK        = RGB(255, 130, 0);
+static const COLORREF COL_CRAB        = RGB(245, 80, 60);
+static const COLORREF COL_CRAB_EYE    = RGB(255, 255, 255);
+static const COLORREF COL_SHIP_SAIL   = RGB(255, 255, 255);
+static const COLORREF COL_SHIP_WOOD   = RGB(230, 205, 45); // Asciiquarium yellow wood
+static const COLORREF COL_SHIP_DARK   = RGB(180, 155, 35);
+static const COLORREF COL_SHIP_CANNON = RGB(35, 35, 35);
+static const COLORREF COL_WHALE_BODY  = RGB(90, 115, 245); // Ocean blue-indigo
+static const COLORREF COL_WHALE_EYE   = RGB(255, 255, 255);
+static const COLORREF COL_WHALE_SPOUT = RGB(85, 235, 255); // Cyan spout
 
 static const COLORREF FISH_COLORS[] = {
     RGB(255, 140, 30),  // Goldfish orange
@@ -29,6 +36,14 @@ static const COLORREF FISH_COLORS[] = {
     RGB(220, 225, 235)  // Silver
 };
 static const int NUM_FISH_COLORS = sizeof(FISH_COLORS) / sizeof(FISH_COLORS[0]);
+
+static const COLORREF JELLY_COLORS[] = {
+    RGB(255, 160, 220), // Translucent pink
+    RGB(170, 220, 255), // Cyan
+    RGB(215, 180, 255), // Lavender
+    RGB(160, 255, 230)  // Bioluminescent mint
+};
+static const int NUM_JELLY_COLORS = sizeof(JELLY_COLORS) / sizeof(JELLY_COLORS[0]);
 
 struct Cell {
     char ch = ' ';
@@ -59,7 +74,7 @@ static void InitAquarium(ScreenData* data, int cols, int rows) {
     for (int i = 0; i < fishCount; ++i) {
         ScreenData::AquaFish f;
         f.x = (float)(rand() % cols);
-        f.y = (float)(rand() % (std::max)(5, rows - 9) + 4);
+        f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
         bool goRight = (rand() % 2 == 0);
         float spd = 0.25f + (float)(rand() % 50) / 100.0f;
         f.vx = goRight ? spd : -spd;
@@ -73,11 +88,23 @@ static void InitAquarium(ScreenData* data, int cols, int rows) {
     int jellyCount = (std::max)(2, cols / 40);
     for (int i = 0; i < jellyCount; ++i) {
         ScreenData::AquaJellyfish j;
-        j.x = (float)(rand() % (cols - 12) + 6);
-        j.y = (float)(rand() % (rows - 15) + 6);
-        j.vy = -0.15f - (float)(rand() % 15) / 100.0f;
+        j.baseX = (float)(rand() % (cols - 14) + 3);
+        j.x = j.baseX;
+        if (i == 0) {
+            j.y = (float)(rows / 2 + rand() % 5);
+            j.state = 0; // Rising
+        } else if (i == 1) {
+            j.y = (float)(rows * 0.7f + rand() % 5);
+            j.state = (rand() % 2 == 0) ? 0 : 1;
+        } else {
+            j.y = (float)(rows + 2 + rand() % 6); // Entering smoothly from below
+            j.state = 0;
+        }
+        j.vy = -0.16f - (float)(rand() % 10) / 100.0f;
         j.pulsePhase = (float)(rand() % 628) / 100.0f;
-        j.color = (rand() % 2 == 0) ? RGB(255, 160, 220) : RGB(170, 220, 255);
+        j.swayOffset = (float)(rand() % 628) / 100.0f;
+        j.topLimit = (float)(rand() % (std::max)(1, rows / 4) + 8);
+        j.color = JELLY_COLORS[rand() % NUM_JELLY_COLORS];
         data->aquaJelly.push_back(j);
     }
 
@@ -87,10 +114,14 @@ static void InitAquarium(ScreenData* data, int cols, int rows) {
     data->aquaCrab.vx = 0.25f;
     data->aquaCrab.animFrame = 0;
 
-    // Duck on surface
-    data->aquaDuck.x = -15.0f;
-    data->aquaDuck.vx = 0.25f;
-    data->aquaDuck.active = (rand() % 3 == 0);
+    // Surface vessel or creature (0=Duck, 1=1700s Ship, 2=Whale)
+    data->aquaSurface.type = rand() % 3;
+    bool goRight = (rand() % 2 == 0);
+    float baseSpd = (data->aquaSurface.type == 1) ? 0.18f : (data->aquaSurface.type == 2 ? 0.22f : 0.25f);
+    data->aquaSurface.vx = goRight ? baseSpd : -baseSpd;
+    data->aquaSurface.x = goRight ? -15.0f : (float)(cols + 5);
+    data->aquaSurface.active = true;
+    data->aquaSurface.animTimer = 0.0f;
 
     data->aquaLastTick = GetTickCount();
     data->aquaInitialized = true;
@@ -146,34 +177,244 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         }
     };
 
-    // 1. Water Surface & Waves (Rows 1-2)
+    int waveRow = (rows < 22) ? 4 : 6;
+
+    // 1. Water Surface & Waves
     for (int x = 0; x < cols; ++x) {
-        float wave = sinf(timeVal * 1.5f + x * 0.28f);
-        char wChar = (wave > 0.45f) ? '^' : (wave > -0.25f ? '~' : '_');
-        COLORREF wCol = (wave > 0.65f) ? COL_WAVE_TOP : COL_WAVE;
-        putChar(x, 2, wChar, wCol);
+        float wave = sinf(timeVal * 1.5f + x * 0.35f);
+        COLORREF wCol = (wave > 0.4f) ? COL_WAVE_TOP : COL_WAVE;
+        putChar(x, waveRow, '~', wCol);
+
+        // Sub-surface ripples (rows waveRow + 1 and waveRow + 2 from asciiquarium)
+        int seg1 = (x + (int)(timeVal * 1.2f)) % 14;
+        if (seg1 >= 0 && seg1 < 3) {
+            putChar(x, waveRow + 1, '^', COL_WAVE);
+        }
+        int seg2 = (x + (int)(timeVal * 0.8f) + 6) % 16;
+        if (seg2 >= 0 && seg2 < 4) {
+            putChar(x, waveRow + 2, '^', COL_WAVE);
+        }
     }
 
-    // Duck floating on surface
-    if (data->aquaDuck.active) {
-        data->aquaDuck.x += data->aquaDuck.vx * (dt * 30.0f);
-        int dx = (int)data->aquaDuck.x;
-        // Duck sprite facing right:
-        //  Row 0:   __
-        //  Row 1: <(o )___
-        //  Row 2:  ( ._> /
-        putStr(dx + 2, 0, "__", COL_DUCK);
-        putChar(dx, 1, '<', COL_BEAK);
-        putStr(dx + 1, 1, "(o )___", COL_DUCK);
-        putStr(dx + 1, 2, "( ._> /", COL_DUCK);
+    // Surface entity (Duck, 1700s Sailing Ship, or Surfacing Whale)
+    if (data->aquaSurface.active) {
+        data->aquaSurface.animTimer += dt;
+        data->aquaSurface.x += data->aquaSurface.vx * (dt * 30.0f);
+        int sx = (int)roundf(data->aquaSurface.x);
+        bool goingRight = (data->aquaSurface.vx > 0.0f);
 
-        if (data->aquaDuck.x > cols + 5) {
-            data->aquaDuck.active = false;
-            data->aquaDuck.x = -15.0f;
+        switch (data->aquaSurface.type) {
+            case 0: { // 1. Rubber Duck (bottom row on water surface waveRow)
+                if (goingRight) {
+                    // Clear background behind duck at waveRow
+                    for (int i = 0; i <= 7; ++i) {
+                        int dx = sx + i;
+                        if (dx >= 0 && dx < cols) grid[waveRow * cols + dx].ch = ' ';
+                    }
+
+                    putStr(sx + 3, waveRow - 2, "__", COL_DUCK);
+                    putStr(sx,     waveRow - 1, "___( ", COL_DUCK);
+                    putChar(sx + 5, waveRow - 1, 'o', COL_CRAB_EYE);
+                    putStr(sx + 6, waveRow - 1, ")>", COL_BEAK);
+                    putStr(sx,     waveRow,     "\\ <_. )", COL_DUCK);
+                } else {
+                    // Clear background behind duck at waveRow
+                    for (int i = 1; i <= 7; ++i) {
+                        int dx = sx + i;
+                        if (dx >= 0 && dx < cols) grid[waveRow * cols + dx].ch = ' ';
+                    }
+
+                    putStr(sx + 2, waveRow - 2, "__", COL_DUCK);
+                    putChar(sx,     waveRow - 1, '<', COL_BEAK);
+                    putStr(sx + 1, waveRow - 1, "(o )___", COL_DUCK);
+                    putStr(sx + 1, waveRow,     "( ._> /", COL_DUCK);
+                }
+                break;
+            }
+            case 1: { // 2. 1700s Wooden Sailing Ship
+                if (goingRight) {
+                    // Mast tips
+                    putChar(sx + 5,  waveRow - 5, '|', COL_SHIP_WOOD);
+                    putChar(sx + 10, waveRow - 5, '|', COL_SHIP_WOOD);
+                    putChar(sx + 15, waveRow - 5, '|', COL_SHIP_WOOD);
+
+                    // Top sails
+                    putStr(sx + 4,   waveRow - 4, ")_)  )_)  )_)", COL_SHIP_SAIL);
+
+                    // Mid sails + rigging
+                    putStr(sx + 3,   waveRow - 3, ")___))___))___)\\", COL_SHIP_SAIL);
+
+                    // Lower sails + rigging
+                    putStr(sx + 2,   waveRow - 2, ")____)____)_____)\\\\", COL_SHIP_SAIL);
+
+                    // Deck line: wood deck with white rigging \\\ at sx+20..22 and wood at end
+                    putStr(sx,       waveRow - 1, "_____|____|____|____", COL_SHIP_WOOD);
+                    putStr(sx + 20,  waveRow - 1, "\\\\\\", COL_SHIP_SAIL);
+                    putStr(sx + 23,  waveRow - 1, "__", COL_SHIP_WOOD);
+
+                    // Clear water waves inside hull so ship is cleanly over waves
+                    for (int i = 1; i < 20; ++i) {
+                        int hx = sx + i;
+                        if (hx >= 0 && hx < cols) grid[waveRow * cols + hx].ch = ' ';
+                    }
+
+                    // Hull at water level (straight water border forms the bottom)
+                    putChar(sx,      waveRow, '\\', COL_SHIP_WOOD);
+                    putChar(sx + 20, waveRow, '/',  COL_SHIP_WOOD);
+                } else {
+                    // Mast tips
+                    putChar(sx + 9,  waveRow - 5, '|', COL_SHIP_WOOD);
+                    putChar(sx + 14, waveRow - 5, '|', COL_SHIP_WOOD);
+                    putChar(sx + 19, waveRow - 5, '|', COL_SHIP_WOOD);
+
+                    // Top sails
+                    putStr(sx + 8,   waveRow - 4, "(_(  (_(  (_(", COL_SHIP_SAIL);
+
+                    // Mid sails + rigging
+                    putStr(sx + 6,   waveRow - 3, "/(___((___((___(", COL_SHIP_SAIL);
+
+                    // Lower sails + rigging
+                    putStr(sx + 4,   waveRow - 2, "//(_____(____(____(", COL_SHIP_SAIL);
+
+                    // Deck line: wood deck with white rigging /// at sx+2..4
+                    putStr(sx,       waveRow - 1, "__", COL_SHIP_WOOD);
+                    putStr(sx + 2,   waveRow - 1, "///", COL_SHIP_SAIL);
+                    putStr(sx + 5,   waveRow - 1, "____|____|____|_____", COL_SHIP_WOOD);
+
+                    // Clear water waves inside hull so ship is cleanly over waves
+                    for (int i = 5; i < 24; ++i) {
+                        int hx = sx + i;
+                        if (hx >= 0 && hx < cols) grid[waveRow * cols + hx].ch = ' ';
+                    }
+
+                    // Hull at water level (straight water border forms the bottom)
+                    putChar(sx + 4,  waveRow, '\\', COL_SHIP_WOOD);
+                    putChar(sx + 24, waveRow, '/',  COL_SHIP_WOOD);
+                }
+                break;
+            }
+            case 2: { // 3. Surfacing Whale with Spout
+                // Animated water spout (7 frames from ASCIIquarium)
+                float spoutTimer = fmodf(data->aquaSurface.animTimer, 4.0f);
+                if (spoutTimer >= 0.8f && spoutTimer < 2.9f) {
+                    int frame = (int)((spoutTimer - 0.8f) / 0.3f);
+                    int bx = goingRight ? (sx + 14) : (sx + 4);
+                    switch (frame) {
+                        case 0:
+                            putChar(bx, waveRow - 3, ':', COL_WHALE_SPOUT);
+                            break;
+                        case 1:
+                            putChar(bx, waveRow - 4, ':', COL_WHALE_SPOUT);
+                            putChar(bx, waveRow - 3, ':', COL_WHALE_SPOUT);
+                            break;
+                        case 2:
+                            putStr(bx - 1, waveRow - 5, ". .", COL_WHALE_SPOUT);
+                            putStr(bx - 1, waveRow - 4, "-:-", COL_WHALE_SPOUT);
+                            putChar(bx,     waveRow - 3, ':',   COL_WHALE_SPOUT);
+                            break;
+                        case 3:
+                            putStr(bx - 1, waveRow - 5, ". .",   COL_WHALE_SPOUT);
+                            putStr(bx - 2, waveRow - 4, ".-:-.", COL_WHALE_SPOUT);
+                            putChar(bx,     waveRow - 3, ':',     COL_WHALE_SPOUT);
+                            break;
+                        case 4:
+                            putStr(bx - 1, waveRow - 5, ". .",     COL_WHALE_SPOUT);
+                            putStr(bx - 3, waveRow - 4, "'.-:-.`", COL_WHALE_SPOUT);
+                            putStr(bx - 3, waveRow - 3, "'  :  '", COL_WHALE_SPOUT);
+                            break;
+                        case 5:
+                            putStr(bx - 2, waveRow - 4, ".- -.",   COL_WHALE_SPOUT);
+                            putStr(bx - 3, waveRow - 3, ";  :  ;", COL_WHALE_SPOUT);
+                            break;
+                        case 6:
+                        default:
+                            putStr(bx - 3, waveRow - 3, ";     ;", COL_WHALE_SPOUT);
+                            break;
+                    }
+                }
+
+                if (goingRight) {
+                    // Whale swimming RIGHT: Head on RIGHT, tail flukes on LEFT
+                    putStr(sx, waveRow - 2, "        .-----:", COL_WHALE_BODY);
+                    putStr(sx, waveRow - 1, "      .'       `.", COL_WHALE_BODY);
+
+                    // Clear only inside body texture at waveRow (sx+6..12 and sx+16)
+                    // Water background between tail fluke (sx) and body slope (sx+5) remains visible at sx+1..4
+                    for (int i = 6; i <= 12; ++i) {
+                        int wx = sx + i;
+                        if (wx >= 0 && wx < cols) grid[waveRow * cols + wx].ch = ' ';
+                    }
+                    if (sx + 16 >= 0 && sx + 16 < cols) grid[waveRow * cols + sx + 16].ch = ' ';
+
+                    // Waterline row (waveRow): tail tip, slope, eye (o), head slope
+                    putChar(sx,      waveRow, ',', COL_WHALE_BODY);
+                    putChar(sx + 5,  waveRow, '/', COL_WHALE_BODY);
+                    putChar(sx + 13, waveRow, '(', COL_WHALE_BODY);
+                    putChar(sx + 14, waveRow, 'o', COL_WHALE_EYE);
+                    putChar(sx + 15, waveRow, ')', COL_WHALE_BODY);
+                    putChar(sx + 17, waveRow, '\\', COL_WHALE_BODY);
+
+                    // Clear only inside belly texture at waveRow + 1 (sx+5..14)
+                    for (int i = 5; i <= 14; ++i) {
+                        int wx = sx + i;
+                        if (wx >= 0 && wx < cols && waveRow + 1 < rows) {
+                            grid[(waveRow + 1) * cols + wx].ch = ' ';
+                        }
+                    }
+
+                    // Underwater row (waveRow + 1)
+                    putStr(sx,      waveRow + 1, "\\`._/", COL_WHALE_BODY);
+                    putStr(sx + 15, waveRow + 1, ",__)",   COL_WHALE_BODY);
+                } else {
+                    // Whale swimming LEFT: Head on LEFT, tail flukes on RIGHT
+                    putStr(sx, waveRow - 2, "    :-----.", COL_WHALE_BODY);
+                    putStr(sx, waveRow - 1, "  .'       `.", COL_WHALE_BODY);
+
+                    // Clear only inside body texture at waveRow (sx+2 and sx+6..12)
+                    // Water background between body slope (sx+13) and tail fluke (sx+18) remains visible at sx+14..17
+                    if (sx + 2 >= 0 && sx + 2 < cols) grid[waveRow * cols + sx + 2].ch = ' ';
+                    for (int i = 6; i <= 12; ++i) {
+                        int wx = sx + i;
+                        if (wx >= 0 && wx < cols) grid[waveRow * cols + wx].ch = ' ';
+                    }
+
+                    // Waterline row (waveRow): head slope, eye (o), back slope, tail tip
+                    putChar(sx + 1,  waveRow, '/',  COL_WHALE_BODY);
+                    putChar(sx + 3,  waveRow, '(',  COL_WHALE_BODY);
+                    putChar(sx + 4,  waveRow, 'o',  COL_WHALE_EYE);
+                    putChar(sx + 5,  waveRow, ')',  COL_WHALE_BODY);
+                    putChar(sx + 13, waveRow, '\\', COL_WHALE_BODY);
+                    putChar(sx + 18, waveRow, ',',  COL_WHALE_BODY);
+
+                    // Clear only inside belly texture at waveRow + 1 (sx+4..13)
+                    for (int i = 4; i <= 13; ++i) {
+                        int wx = sx + i;
+                        if (wx >= 0 && wx < cols && waveRow + 1 < rows) {
+                            grid[(waveRow + 1) * cols + wx].ch = ' ';
+                        }
+                    }
+
+                    // Underwater row (waveRow + 1)
+                    putStr(sx,      waveRow + 1, "(__,",   COL_WHALE_BODY);
+                    putStr(sx + 14, waveRow + 1, "\\_.'/", COL_WHALE_BODY);
+                }
+                break;
+            }
         }
-    } else if (rand() % 400 == 0) {
-        data->aquaDuck.active = true;
-        data->aquaDuck.x = -15.0f;
+
+        if (goingRight && data->aquaSurface.x > cols + 35) {
+            data->aquaSurface.active = false;
+        } else if (!goingRight && data->aquaSurface.x < -35.0f) {
+            data->aquaSurface.active = false;
+        }
+    } else if (rand() % 30 == 0) {
+        data->aquaSurface.active = true;
+        data->aquaSurface.type = (data->aquaSurface.type + 1 + (rand() % 2)) % 3;
+        bool goRight = (rand() % 2 == 0);
+        float baseSpd = (data->aquaSurface.type == 1) ? 0.18f : (data->aquaSurface.type == 2 ? 0.22f : 0.25f);
+        data->aquaSurface.vx = goRight ? baseSpd : -baseSpd;
+        data->aquaSurface.x = goRight ? -30.0f : (float)(cols + 30);
+        data->aquaSurface.animTimer = 0.0f;
     }
 
     // 2. Seabed (Sand & Pebbles)
@@ -189,7 +430,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     for (const auto& sw : data->aquaSeaweed) {
         for (int h = 0; h < sw.height; ++h) {
             int curY = sandRow - 1 - h;
-            if (curY < 3) break;
+            if (curY <= waveRow) break;
             float sway = sinf(timeVal * 1.1f + sw.phase + h * 0.32f) * 1.8f;
             int curX = sw.x + (int)roundf(sway);
             char stem = (sway > 0.5f) ? '/' : (sway < -0.5f ? '\\' : '|');
@@ -217,29 +458,57 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
     // 5. Jellyfish
     for (auto& j : data->aquaJelly) {
-        j.pulsePhase += dt * 2.5f;
+        float pulseSpeed = (j.state == 0) ? 2.3f : 1.6f;
+        j.pulsePhase += dt * pulseSpeed;
         float pulse = sinf(j.pulsePhase);
-        j.y += (pulse > 0.2f ? j.vy : j.vy * 0.2f) * (dt * 40.0f);
-        j.x += sinf(j.pulsePhase * 0.5f) * 0.15f;
 
-        if (j.y < 3.0f) {
-            j.y = (float)(rows - 10);
-            j.x = (float)(rand() % (cols - 12) + 6);
+        if (j.state == 0) {
+            // Swimming UP:
+            // Upward propulsion during contraction pulse, slower upward glide during expansion
+            float thrust = (pulse > 0.1f) ? j.vy : (j.vy * 0.25f);
+            j.y += thrust * (dt * 30.0f);
+
+            // Reached apex below waves: transition to gentle descent
+            if (j.y <= j.topLimit) {
+                j.state = 1;
+                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 2);
+            }
+        } else {
+            // Drifting / Swimming DOWN:
+            // Sinks downwards with gentle pulses slowing the sink rate
+            float sinkRate = (pulse > 0.2f) ? 0.04f : 0.15f;
+            j.y += sinkRate * (dt * 30.0f);
+
+            // Exited completely below screen: respawn smoothly from below
+            if (j.y > rows + 6) {
+                j.y = (float)(rows + 2 + rand() % 5);
+                j.baseX = (float)(rand() % (cols - 14) + 3);
+                j.state = 0;
+                j.vy = -0.16f - (float)(rand() % 10) / 100.0f;
+                j.swayOffset = (float)(rand() % 628) / 100.0f;
+                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 2);
+                j.color = JELLY_COLORS[rand() % NUM_JELLY_COLORS];
+            }
         }
 
-        int jx = (int)j.x;
-        int jy = (int)j.y;
+        // Horizontal sway around baseX (no accumulation drift or truncation flickering)
+        float sway = sinf(j.pulsePhase * 0.5f + j.swayOffset) * 1.5f;
+        j.x = j.baseX + sway;
+
+        int jx = (int)roundf(j.x);
+        int jy = (int)roundf(j.y);
+
         if (pulse > 0.0f) {
-            // Expanded bell
-            putStr(jx + 1, jy,     ".-\"\"-.", j.color);
-            putStr(jx,     jy + 1, "/      \\", j.color);
+            // Expanded bell (vertically symmetric, centered at jx + 4.5)
+            putStr(jx + 2, jy,     ".-\"\"-.", j.color);
+            putStr(jx + 1, jy + 1, "/      \\", j.color);
             putStr(jx,     jy + 2, "(`~~~~~~`)", j.color);
             putStr(jx + 1, jy + 3, "|| || ||", j.color);
             putStr(jx + 1, jy + 4, "|| || ||", j.color);
         } else {
-            // Contracted bell
-            putStr(jx + 2, jy,     "_.._", j.color);
-            putStr(jx + 1, jy + 1, "/    \\", j.color);
+            // Contracted bell (vertically symmetric, centered at jx + 4.5)
+            putStr(jx + 3, jy,     "_.._", j.color);
+            putStr(jx + 2, jy + 1, "/    \\", j.color);
             putStr(jx + 1, jy + 2, "(~~~~~~)", j.color);
             putStr(jx + 1, jy + 3, "// || \\\\", j.color);
             putStr(jx + 1, jy + 4, "// || \\\\", j.color);
@@ -280,11 +549,11 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         // Turnaround / Wrap-around
         if (goingRight && f.x > cols + 15) {
             f.x = -15.0f;
-            f.y = (float)(rand() % (std::max)(5, rows - 9) + 4);
+            f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
             f.color = FISH_COLORS[rand() % NUM_FISH_COLORS];
         } else if (!goingRight && f.x < -15.0f) {
             f.x = (float)(cols + 15);
-            f.y = (float)(rand() % (std::max)(5, rows - 9) + 4);
+            f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
             f.color = FISH_COLORS[rand() % NUM_FISH_COLORS];
         }
 
@@ -312,68 +581,64 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
                 }
                 break;
 
-            case 1: // Guppy / Tetra: >(')))>< or ><(((')<
+            case 1: // Guppy / Tetra
                 if (goingRight) {
-                    putStr(fx, fy, ">(')))><", f.color);
+                    putStr(fx, fy, "><((('>", f.color); // tail left, body, head right
                 } else {
-                    putStr(fx, fy, "><(((')<", f.color);
+                    putStr(fx, fy, "<')))><", f.color); // head left, body, tail right
                 }
                 break;
 
-            case 2: // Striped Angelfish (3 rows)
+            case 2: // Classic Fish (5 rows, clearly directional)
                 if (goingRight) {
-                    putStr(fx + 2, fy - 1, "\\", f.color);
-                    putStr(fx + 1, fy,     "/--\\", f.color);
-                    putStr(fx,     fy + 1, "< () >", f.color);
-                    putStr(fx + 1, fy + 2, "\\--/", f.color);
-                    putStr(fx + 2, fy + 3, "/", f.color);
+                    putStr(fx + 4, fy - 1, "\\",       f.color);
+                    putStr(fx,     fy,     "\\ /--\\", f.color);
+                    putStr(fx,     fy + 1, ">=  (o>",  f.color);
+                    putStr(fx,     fy + 2, "/ \\__/",  f.color);
+                    putStr(fx + 4, fy + 3, "/",        f.color);
+                    putChar(fx + 5, fy + 1, 'o', COL_CRAB_EYE);
                 } else {
-                    putStr(fx + 3, fy - 1, "/", f.color);
-                    putStr(fx + 1, fy,     "/--\\", f.color);
-                    putStr(fx,     fy + 1, "< () >", f.color);
-                    putStr(fx + 1, fy + 2, "\\--/", f.color);
-                    putStr(fx + 3, fy + 3, "\\", f.color);
+                    putStr(fx + 2, fy - 1, "/",        f.color);
+                    putStr(fx + 1, fy,     "/--\\ /",  f.color);
+                    putStr(fx,     fy + 1, "<o)  =<",  f.color);
+                    putStr(fx + 1, fy + 2, "\\__/ \\", f.color);
+                    putStr(fx + 2, fy + 3, "\\",        f.color);
+                    putChar(fx + 1, fy + 1, 'o', COL_CRAB_EYE);
                 }
                 break;
 
-            case 3: // Fantail Goldfish (4 rows)
+            case 3: // Classic Tetra Fish (5 rows, clearly directional)
                 if (goingRight) {
-                    putStr(fx + 3, fy,     ",", f.color);
-                    putStr(fx + 2, fy + 1, "/|", f.color);
-                    putStr(fx + 1, fy + 2, "/_|/\\", f.color);
-                    putStr(fx,     fy + 3, "<* )  >", f.color);
-                    putStr(fx + 1, fy + 4, "\\ |\\/", f.color);
-                    putStr(fx + 2, fy + 5, "\\|", f.color);
-                    putStr(fx + 3, fy + 6, "`", f.color);
+                    putStr(fx + 3, fy - 1, "\\",     f.color);
+                    putStr(fx + 2, fy,     "/ \\",   f.color);
+                    putStr(fx,     fy + 1, ">=_('>", f.color);
+                    putStr(fx + 2, fy + 2, "\\_/",   f.color);
+                    putStr(fx + 3, fy + 3, "/",      f.color);
+                    putChar(fx + 4, fy + 1, '\'', COL_CRAB_EYE);
                 } else {
-                    putStr(fx + 2, fy,     ",", f.color);
-                    putStr(fx + 2, fy + 1, "|\\", f.color);
-                    putStr(fx + 1, fy + 2, "/\\|_\\", f.color);
-                    putStr(fx,     fy + 3, "<  ( *>", f.color);
-                    putStr(fx + 1, fy + 4, "\\/| /", f.color);
-                    putStr(fx + 2, fy + 5, "|/", f.color);
-                    putStr(fx + 2, fy + 6, "`", f.color);
+                    putStr(fx + 2, fy - 1, "/",      f.color);
+                    putStr(fx + 1, fy,     "/ \\",   f.color);
+                    putStr(fx,     fy + 1, "<')_=<", f.color);
+                    putStr(fx + 1, fy + 2, "\\_/",   f.color);
+                    putStr(fx + 2, fy + 3, "\\",      f.color);
+                    putChar(fx + 1, fy + 1, '\'', COL_CRAB_EYE);
                 }
                 break;
 
-            case 4: // Big Shark / Whale (occasional deep cruiser)
+            case 4: // Shark (3 rows, clearly directional)
             default:
                 if (goingRight) {
-                    putStr(fx + 7, fy,     "__", f.color);
-                    putStr(fx,     fy + 1, "\\_____  / /", f.color);
-                    putStr(fx + 1, fy + 2, "\\    \\/ /", f.color);
-                    putStr(fx + 2, fy + 3, "\\  O   /", f.color);
-                    putStr(fx + 3, fy + 4, ">     <", f.color);
-                    putStr(fx + 2, fy + 5, "/       \\", f.color);
-                    putStr(fx + 1, fy + 6, "/  _____  \\", f.color);
+                    // Head > on RIGHT, tail == on LEFT, dorsal fin on top
+                    putStr(fx + 4, fy,     "/\\",        f.color); // dorsal fin
+                    putStr(fx,     fy + 1, "====( o)-->", f.color); // body: tail left, eye, snout right
+                    putStr(fx + 4, fy + 2, "\\/",        f.color); // pectoral fin
+                    putChar(fx + 6, fy + 1, 'o', COL_CRAB_EYE);
                 } else {
-                    putStr(fx + 2, fy,     "__", f.color);
-                    putStr(fx + 1, fy + 1, "\\ \\  _____/", f.color);
-                    putStr(fx + 1, fy + 2, "\\ \\/    /", f.color);
-                    putStr(fx + 2, fy + 3, "\\   O  /", f.color);
-                    putStr(fx + 3, fy + 4, ">     <", f.color);
-                    putStr(fx + 2, fy + 5, "/       \\", f.color);
-                    putStr(fx + 1, fy + 6, "/  _____  \\", f.color);
+                    // Head < on LEFT, tail == on RIGHT
+                    putStr(fx + 3, fy,     "/\\",        f.color); // dorsal fin
+                    putStr(fx,     fy + 1, "<--(o )===", f.color); // snout left, eye, tail right
+                    putStr(fx + 3, fy + 2, "\\/",        f.color); // pectoral fin
+                    putChar(fx + 4, fy + 1, 'o', COL_CRAB_EYE);
                 }
                 break;
         }
@@ -388,7 +653,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         int bx = (int)roundf(b.x + sinf(b.swayPhase) * 1.4f);
         int by = (int)b.y;
 
-        if (by <= 2) {
+        if (by <= waveRow) {
             // Pop at water surface
             data->aquaBubbles.erase(data->aquaBubbles.begin() + i);
         } else {
