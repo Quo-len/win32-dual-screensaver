@@ -10,10 +10,10 @@ struct ID3D11Texture2D;
 struct IDXGISurface1;
 
 struct HarmoPendulum {
-    double amp;   // amplitude (normalized)
-    double freq;  // angular frequency (rad per curve-unit)
-    double phase; // initial phase offset
-    double damp;  // damping (0 = no decay)
+    double amp;    
+    double freq;   
+    double phase; 
+    double damp;  
 };
 
 struct MazeCell {
@@ -125,15 +125,13 @@ struct ScreenData {
 
     std::vector<AntState> ants;
     std::vector<unsigned char> antGrid;
-    std::vector<unsigned char> cyclicNext;  // Cyclic CA double-buffer
+    std::vector<unsigned char> cyclicNext;  
     int antCols = 0;
     int antRows = 0;
     unsigned int currentAntColor;
 
-    // Boids velocities (positions reuse flowParticles)
     std::vector<float> boidVX, boidVY;
 
-    // Pipes pipe-head tracking
     std::vector<int>      pipeHeads;
     std::vector<int>      pipeDirs;
     std::vector<COLORREF> pipeColors;
@@ -264,6 +262,23 @@ struct ScreenData {
     std::vector<BonsaiShoot> bonsaiActiveShoots;
     std::vector<BonsaiPetal> bonsaiPetals;
     std::vector<POINT> bonsaiLeaves;
+
+    // Nyan Cat (ASCII)
+    struct NyanStar {
+        float x, y;
+        float speed;
+        int type;
+        int phase;
+    };
+    bool nyanInitialized = false;
+    DWORD nyanLastTick = 0;
+    DWORD nyanStartTime = 0;
+    int nyanFrameIndex = 0;
+    HFONT nyanFont = NULL;
+    int nyanFontSize = 0;
+    int nyanWidthInChars = 0;
+    int nyanHeightInChars = 0;
+    std::vector<NyanStar> nyanStars;
 
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;

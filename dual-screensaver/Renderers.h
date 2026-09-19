@@ -30,3 +30,4 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
 void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

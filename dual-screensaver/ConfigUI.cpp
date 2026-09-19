@@ -6,7 +6,7 @@
 
 extern HINSTANCE hInst;
 
-#define NUM_SCREENSAVERS 28  
+#define NUM_SCREENSAVERS 29  
 
 #define IDAPPLY_MAIN 2200
 #define IDAPPLY_SUB 2300
@@ -105,7 +105,6 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 		SendMessage(hReset, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hApply, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		// Resize window to fit contents
 		RECT rc = { 0, 0, col1X + lblW + edtW + 40, y + 60 };
 		AdjustWindowRectEx(&rc, WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_TOOLWINDOW);
 		SetWindowPos(hWnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
@@ -295,7 +294,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			btnApplyX, optionsY, btnApplyW, btnApplyH, hWnd, (HMENU)IDAPPLY_MAIN, hInst, NULL);
 		SendMessage(hApply, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		// Auto-size and center the window so all controls and Apply button are completely visible with bottom padding
 		int clientH = optionsY + btnApplyH + 25;
 		RECT rc = { 0, 0, clientW, clientH };
 		AdjustWindowRectEx(&rc, WS_VISIBLE | WS_SYSMENU | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
@@ -332,7 +330,6 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			WCHAR title[128];
 			swprintf(title, 128, L"%s Settings", g_modeNames[ss_id]);
 			
-			// Open non-modal independent window for live tweaking
 			HWND hSub = CreateWindowExW(WS_EX_TOOLWINDOW, L"SaverSubSettingsClass", title,
 				WS_VISIBLE | WS_SYSMENU | WS_CAPTION,
 				CW_USEDEFAULT, CW_USEDEFAULT, 300, 300,

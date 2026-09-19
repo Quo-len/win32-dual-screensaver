@@ -26,7 +26,7 @@ const WCHAR* g_modeNames[] = {
 	L"Boids Flocking", L"Cyclic CA", L"Pipes", L"Brian's Brain",
 	L"Mandelbrot Zoom", L"Clifford Attractor", L"Curl Noise Particles",
 	L"Harmonograph", L"Bad Apple (ASCII)", L"ASCIIQuarium",
-	L"cbonsai (Bonsai Tree)"
+	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)"
 };
 
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
@@ -39,7 +39,7 @@ static const RenderFn g_renderers[] = {
 	RenderBoids, RenderCyclicCA, RenderPipes, RenderBriansBrain,
 	RenderMandelbrot, RenderClifford, RenderCurlNoise,
 	RenderHarmonograph, RenderBadApple, RenderASCIIQuarium,
-	RenderBonsai
+	RenderBonsai, RenderNyanCat
 };
 
 #define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
@@ -68,7 +68,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"harmonograph", 24}, {L"harmo", 24},
 		{L"badapple", 25}, {L"bad-apple", 25}, {L"apple", 25}, {L"ascii", 25},
 		{L"asciiquarium", 26}, {L"aquarium", 26}, {L"fish", 26},
-		{L"cbonsai", 27}, {L"bonsai", 27}, {L"tree", 27}
+		{L"cbonsai", 27}, {L"bonsai", 27}, {L"tree", 27},
+		{L"nyancat", 28}, {L"nyan", 28}, {L"cat", 28}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
@@ -287,6 +288,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (data) {
 			if (data->hFont) DeleteObject(data->hFont);
 			if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
+			if (data->nyanFont) DeleteObject(data->nyanFont);
 			delete data;
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
 		}
