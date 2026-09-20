@@ -144,7 +144,7 @@
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Perlin.h" />
-    <ClInclude Include="renderers\Renderers.h" />
+    <ClInclude Include="Renderers.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="ScreenData.h" />
     <ClInclude Include="renderers\NyanCatFrames.h" />
@@ -193,9 +193,7 @@
     <Image Include="dual-screensaver.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="idc_edit.bin" />
-  </ItemGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
