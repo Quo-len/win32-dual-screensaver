@@ -58,9 +58,20 @@ To have **DualSaver** appear in the official Windows Screen Saver dropdown along
 Download `DualScreenSaver.scr` directly from the [GitHub Releases](https://github.com/Quo-len/win32-dual-screensaver/releases) page. Right-click the `.scr` file and click **Install**.
 
 ### Option B: Build from Source
-Build the `Release` configuration in Visual Studio (**Ctrl + Shift + B**) or via MSBuild:
+
+You can build using Visual Studio (**Ctrl + Shift + B**), or use [`just`](https://github.com/casey/just) for quick developer tasks:
+
 ```powershell
-msbuild dual-screensaver\dual-screensaver.vcxproj /p:Configuration=Release /p:Platform=x64 -m
+just build     # Build Release (x64) and create DualScreenSaver.scr
+just bench     # Run automated performance & GDI leak benchmark
+just config    # Launch configuration settings dialog (/c)
+just run       # Launch screensaver in fullscreen (/s)
+just clean     # Clean intermediate build files
+```
+
+Or via MSBuild directly:
+```powershell
+msbuild dual-screensaver.slnx /p:Configuration=Release /p:Platform=x64 /v:minimal
 ```
 The build automatically generates both `DualScreenSaver.exe` and `DualScreenSaver.scr` in `dual-screensaver\x64\Release\`.
 
