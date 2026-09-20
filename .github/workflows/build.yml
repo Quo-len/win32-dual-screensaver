@@ -1,0 +1,71 @@
+name: Build & Release Screensaver
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Screensaver (.scr / .exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build dual-screensaver (Release x64)
+        run: |
+          msbuild dual-screensaver/dual-screensaver.vcxproj /p:Configuration=Release /p:Platform=x64 -m
+
+      - name: Prepare distribution artifacts
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+          
+          $releaseDir = "dual-screensaver/x64/Release"
+          $scrPath = "$releaseDir/DualScreenSaver.scr"
+          $exePath = "$releaseDir/DualScreenSaver.exe"
+          
+          if (!(Test-Path $scrPath)) {
+            Write-Error "DualScreenSaver.scr not found in $releaseDir"
+            exit 1
+          }
+          
+          Copy-Item $scrPath -Destination "dist/DualScreenSaver.scr"
+          Copy-Item $exePath -Destination "dist/DualScreenSaver.exe"
+          Copy-Item "README.md" -Destination "dist/README.md"
+          
+          Compress-Archive -Path "dist/DualScreenSaver.scr", "dist/DualScreenSaver.exe", "dist/README.md" -DestinationPath "dist/DualScreenSaver-x64.zip" -Force
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DualScreenSaver-x64
+          path: |
+            dist/DualScreenSaver.scr
+            dist/DualScreenSaver.exe
+            dist/DualScreenSaver-x64.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/DualScreenSaver.scr
+            dist/DualScreenSaver.exe
+            dist/DualScreenSaver-x64.zip
+          generate_release_notes: true

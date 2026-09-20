@@ -105,6 +105,10 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(OutDir)$(TargetName).exe" "$(OutDir)$(TargetName).scr"</Command>
+      <Message>Creating .scr screensaver binary...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -138,6 +142,10 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(OutDir)$(TargetName).exe" "$(OutDir)$(TargetName).scr"</Command>
+      <Message>Creating .scr screensaver binary...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Defaults.h" />

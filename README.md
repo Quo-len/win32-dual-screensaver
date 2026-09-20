@@ -14,7 +14,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 
 ---
 
-## Visual Modes (28 Built-in)
+## Visual Modes (29 Built-in)
 
 | #   | Mode                     | Description                                                               |
 | --- | ------------------------ | ------------------------------------------------------------------------- |
@@ -46,6 +46,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 | 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression         |
 | 26  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp |
 | 27  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes    |
+| 28  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars |
 
 ---
 
@@ -53,28 +54,24 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 
 To have **DualSaver** appear in the official Windows Screen Saver dropdown alongside built-in screensavers (Mystify, Ribbons, etc.):
 
-### Step 1: Build the Project
+### Option A: Download Pre-built Release
+Download `DualScreenSaver.scr` directly from the [GitHub Releases](https://github.com/Quo-len/win32-dual-screensaver/releases) page. Right-click the `.scr` file and click **Install**.
 
-Build the `Release` (or `Debug`) configuration:
-
-- In Visual Studio: Select `Release` & `x64`, then press **Ctrl + Shift + B**.
-- Or via PowerShell:
-  ```powershell
-  & "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe" "dual-screensaver\dual-screensaver.vcxproj" /p:Configuration=Release /p:Platform=x64
-  ```
-
-### Step 2: Copy as `.scr` into `System32`
-
-Windows detects screensavers by looking for `.scr` files inside `C:\Windows\System32`.
-
-Run PowerShell **as Administrator** and execute:
-
+### Option B: Build from Source
+Build the `Release` configuration in Visual Studio (**Ctrl + Shift + B**) or via MSBuild:
 ```powershell
-# Copy and rename the executable to .scr in System32
-Copy-Item ".\dual-screensaver\x64\Release\DualScreenSaver.exe" "C:\Windows\System32\DualScreenSaver.scr" -Force
+msbuild dual-screensaver\dual-screensaver.vcxproj /p:Configuration=Release /p:Platform=x64 -m
 ```
+The build automatically generates both `DualScreenSaver.exe` and `DualScreenSaver.scr` in `dual-screensaver\x64\Release\`.
 
-_(If building Debug, use `.\dual-screensaver\x64\Debug\DualScreenSaver-Debug.exe`)_.
+### Step 2: Copy as `.scr` into `System32` (or Right-Click Install)
+
+You can either:
+- **Right-click** `dual-screensaver\x64\Release\DualScreenSaver.scr` and select **Install**.
+- Or run PowerShell **as Administrator** to copy into `System32`:
+```powershell
+Copy-Item ".\dual-screensaver\x64\Release\DualScreenSaver.scr" "C:\Windows\System32\DualScreenSaver.scr" -Force
+```
 
 ### Step 3: Select in Windows
 
