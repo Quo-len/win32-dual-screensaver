@@ -152,6 +152,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Benchmark.h" />
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
@@ -165,6 +166,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dual-screensaver.cpp" />
+    <ClCompile Include="Benchmark.cpp" />
     <ClCompile Include="Perlin.cpp" />
     <ClCompile Include="renderers\RenderBlank.cpp" />
     <ClCompile Include="renderers\RenderClock.cpp" />

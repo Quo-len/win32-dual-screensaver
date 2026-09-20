@@ -285,4 +285,11 @@ struct ScreenData {
     IDXGISwapChain* pSwapChain = nullptr;
     ID3D11Texture2D* pBackBuffer = nullptr;
     IDXGISurface1* pSurface = nullptr;
+
+    // Live Diagnostics & Performance HUD
+    double lastRenderTimeMs = 0.0;
+    double avgRenderTimeMs = 0.0;
+    double currentFps = 0.0;
+    DWORD lastFpsUpdateTick = 0;
+    int frameCounter = 0;
 };

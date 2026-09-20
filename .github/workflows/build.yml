@@ -30,6 +30,18 @@ jobs:
         run: |
           msbuild dual-screensaver/dual-screensaver.vcxproj /p:Configuration=Release /p:Platform=x64 -m
 
+      - name: Run performance and GDI leak benchmarks
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "dual-screensaver/x64/Release/DualScreenSaver.exe" -ArgumentList "--benchmark" -Wait -PassThru
+          if (Test-Path "benchmark_report.txt") {
+            Get-Content "benchmark_report.txt"
+          }
+          if ($p.ExitCode -ne 0) {
+            Write-Error "Benchmark tests failed with exit code $($p.ExitCode)"
+            exit $p.ExitCode
+          }
+
       - name: Prepare distribution artifacts
         shell: powershell
         run: |
@@ -47,6 +59,9 @@ jobs:
           Copy-Item $scrPath -Destination "dist/DualScreenSaver.scr"
           Copy-Item $exePath -Destination "dist/DualScreenSaver.exe"
           Copy-Item "README.md" -Destination "dist/README.md"
+          if (Test-Path "benchmark_report.txt") {
+            Copy-Item "benchmark_report.txt" -Destination "dist/benchmark_report.txt"
+          }
           
           Compress-Archive -Path "dist/DualScreenSaver.scr", "dist/DualScreenSaver.exe", "dist/README.md" -DestinationPath "dist/DualScreenSaver-x64.zip" -Force
 
@@ -58,6 +73,7 @@ jobs:
             dist/DualScreenSaver.scr
             dist/DualScreenSaver.exe
             dist/DualScreenSaver-x64.zip
+            dist/benchmark_report.txt
           if-no-files-found: error
 
       - name: Publish GitHub Release

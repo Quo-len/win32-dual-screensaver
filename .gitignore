@@ -36,4 +36,5 @@ packages/
 
 # Windows screensaver output
 *.scr
+benchmark_report.txt
 TODO.md

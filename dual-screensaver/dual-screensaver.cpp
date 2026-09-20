@@ -6,16 +6,22 @@
 #include "ScreenData.h"
 #include "Perlin.h"
 #include "Renderers.h"
+#include "Benchmark.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <vector>
+#include <psapi.h>
+
+#pragma comment(lib, "psapi.lib")
 
 #define MAX_LOADSTRING 100
 
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
 WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
+
+bool g_ShowDebugHUD = false;
 
 const WCHAR* g_modeNames[] = {
 	L"Donut", L"Game of Life", L"Matrix", L"Earth",
@@ -29,8 +35,7 @@ const WCHAR* g_modeNames[] = {
 	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)"
 };
 
-using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
-static const RenderFn g_renderers[] = {
+const RenderFn g_renderers[] = {
 	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
 	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
@@ -42,7 +47,8 @@ static const RenderFn g_renderers[] = {
 	RenderBonsai, RenderNyanCat
 };
 
-#define NUM_SCREENSAVERS (int)(sizeof(g_renderers) / sizeof(g_renderers[0]))
+const int g_numScreensavers = (int)(sizeof(g_renderers) / sizeof(g_renderers[0]));
+#define NUM_SCREENSAVERS g_numScreensavers
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -57,6 +63,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	hInst = hInstance;
 	srand((unsigned int)time(NULL));
 	LoadSettings();
+
+	if (wcsstr(lpCmdLine, L"/benchmark") || wcsstr(lpCmdLine, L"--benchmark") || wcsstr(lpCmdLine, L"/bench") || wcsstr(lpCmdLine, L"-bench"))
+	{
+		return RunBenchmark();
+	}
+	if (wcsstr(lpCmdLine, L"/debug") || wcsstr(lpCmdLine, L"--debug") || wcsstr(lpCmdLine, L"-debug"))
+	{
+		g_ShowDebugHUD = true;
+	}
 
 	const struct { const wchar_t* name; int idx; } modeMap[] = {
 		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
@@ -196,6 +211,79 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	return TRUE;
 }
 
+static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int mode)
+{
+	int boxW = 280;
+	int boxH = 135;
+	int boxX = width - boxW - 20;
+	int boxY = 20;
+
+	// Background card
+	HBRUSH bgBrush = CreateSolidBrush(RGB(15, 20, 28));
+	HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(55, 75, 110));
+	HGDIOBJ oldBrush = SelectObject(hdc, bgBrush);
+	HGDIOBJ oldPen = SelectObject(hdc, borderPen);
+
+	RoundRect(hdc, boxX, boxY, boxX + boxW, boxY + boxH, 8, 8);
+
+	SelectObject(hdc, oldBrush);
+	SelectObject(hdc, oldPen);
+	DeleteObject(bgBrush);
+	DeleteObject(borderPen);
+
+	// Font & text setup
+	HFONT hHudFont = CreateFontA(14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+		FIXED_PITCH | FF_MODERN, "Consolas");
+	HGDIOBJ oldFont = SelectObject(hdc, hHudFont);
+	SetBkMode(hdc, TRANSPARENT);
+
+	// Line 1: Title
+	SetTextColor(hdc, RGB(255, 205, 50));
+	TextOutA(hdc, boxX + 12, boxY + 10, "[F3] PERFORMANCE HUD", 20);
+
+	// Metrics
+	DWORD gdiHandles = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+	PROCESS_MEMORY_COUNTERS pmc = { sizeof(pmc) };
+	GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+	double ramMB = (double)pmc.WorkingSetSize / (1024.0 * 1024.0);
+
+	char buf[128];
+
+	// Line 2: Mode name
+	SetTextColor(hdc, RGB(220, 230, 245));
+	char modeNameA[64];
+	WideCharToMultiByte(CP_UTF8, 0, g_modeNames[mode], -1, modeNameA, sizeof(modeNameA), NULL, NULL);
+	int len = sprintf_s(buf, "Mode: %s (#%02d)", modeNameA, mode);
+	TextOutA(hdc, boxX + 12, boxY + 32, buf, len);
+
+	// Line 3: Render time
+	double lastMs = data->lastRenderTimeMs;
+	double avgMs = data->avgRenderTimeMs;
+	COLORREF perfColor = (avgMs > 16.67) ? RGB(255, 90, 90) : (avgMs > 8.0 ? RGB(255, 180, 50) : RGB(80, 230, 120));
+	SetTextColor(hdc, perfColor);
+	len = sprintf_s(buf, "Render: %.2f ms (Avg: %.2f ms)", lastMs, avgMs);
+	TextOutA(hdc, boxX + 12, boxY + 54, buf, len);
+
+	// Line 4: FPS
+	double maxFps = (avgMs > 0.001) ? (1000.0 / avgMs) : 9999.0;
+	SetTextColor(hdc, RGB(180, 200, 220));
+	len = sprintf_s(buf, "FPS: %.0f / 30 (Max: %.0f)", data->currentFps, maxFps);
+	TextOutA(hdc, boxX + 12, boxY + 74, buf, len);
+
+	// Line 5: Resources (GDI + RAM)
+	SetTextColor(hdc, RGB(140, 170, 200));
+	len = sprintf_s(buf, "GDI: %lu objs | RAM: %.1f MB", gdiHandles, ramMB);
+	TextOutA(hdc, boxX + 12, boxY + 94, buf, len);
+
+	// Line 6: Resolution
+	len = sprintf_s(buf, "Resolution: %dx%d", width, height);
+	TextOutA(hdc, boxX + 12, boxY + 112, buf, len);
+
+	SelectObject(hdc, oldFont);
+	DeleteObject(hHudFont);
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static POINT initialMousePos;
@@ -254,8 +342,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
+		LARGE_INTEGER tStart, tEnd, tFreq;
+		QueryPerformanceFrequency(&tFreq);
+		QueryPerformanceCounter(&tStart);
+
 		if (mode >= 0 && mode < NUM_SCREENSAVERS)
 			g_renderers[mode](memDC, data, width, height, rect);
+
+		QueryPerformanceCounter(&tEnd);
+		double frameMs = (double)(tEnd.QuadPart - tStart.QuadPart) * 1000.0 / (double)tFreq.QuadPart;
+		data->lastRenderTimeMs = frameMs;
+		if (data->avgRenderTimeMs <= 0.0) data->avgRenderTimeMs = frameMs;
+		else data->avgRenderTimeMs = data->avgRenderTimeMs * 0.9 + frameMs * 0.1;
+
+		data->frameCounter++;
+		DWORD now = GetTickCount();
+		if (now - data->lastFpsUpdateTick >= 500) {
+			data->currentFps = (data->frameCounter * 1000.0) / (double)(now - data->lastFpsUpdateTick);
+			data->frameCounter = 0;
+			data->lastFpsUpdateTick = now;
+		}
+
+		if (g_ShowDebugHUD && !data->isPreview) {
+			DrawDebugHUD(memDC, data, width, height, mode);
+		}
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -280,6 +390,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	break;
 	case WM_KEYDOWN:
+		if (wParam == VK_F3) {
+			g_ShowDebugHUD = !g_ShowDebugHUD;
+			InvalidateRect(hWnd, NULL, FALSE);
+			break;
+		}
 	case WM_LBUTTONDOWN:
 	case WM_RBUTTONDOWN:
 		if (data && !data->isPreview) PostQuitMessage(0);

@@ -132,11 +132,16 @@ The screensaver executable supports standard Windows screensaver flags as well a
 | `/c`              | Opens the graphical Settings configuration dialog              | `DualScreenSaver.exe /c`           |
 | `/pool`           | Opens the Randomizer Pool checklist dialog directly            | `DualScreenSaver.exe /pool`        |
 | `/p <HWND>`       | Renders preview inside parent window handle                    | `DualScreenSaver.exe /p 123456`    |
+| `/debug`          | Launches with live Performance HUD overlay enabled by default  | `DualScreenSaver.exe /debug`       |
+| `--benchmark`     | Runs headless performance benchmark & GDI leak test on all modes| `DualScreenSaver.exe --benchmark` |
 | `<mode1> [mode2]` | Launch immediately with specific modes by name                 | `DualScreenSaver.exe matrix earth` |
+
+> [!TIP]
+> **Live Diagnostics HUD**: Press **`F3`** at any time while the screensaver is running to toggle the real-time Performance HUD (frame time latency in ms, FPS capacity, GDI handle count, and memory usage).
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`.
 
 ---
 
