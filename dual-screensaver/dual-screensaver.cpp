@@ -12,8 +12,12 @@
 #include <time.h>
 #include <vector>
 #include <psapi.h>
+#include <combaseapi.h>
+#include <dxgi.h>
+#include <dxgi1_4.h>
 
 #pragma comment(lib, "psapi.lib")
+#pragma comment(lib, "dxgi.lib")
 
 #define MAX_LOADSTRING 100
 
@@ -205,16 +209,110 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 		mi.rcMonitor.left, mi.rcMonitor.top,
 		mi.rcMonitor.right - mi.rcMonitor.left,
 		mi.rcMonitor.bottom - mi.rcMonitor.top,
-		nullptr, nullptr, hInst, (LPVOID)(mi.dwFlags & MONITORINFOF_PRIMARY));
+		nullptr, nullptr, hInst, (LPVOID)(UINT_PTR)(mi.dwFlags & MONITORINFOF_PRIMARY));
 
 	ShowCursor(FALSE);
 	return TRUE;
 }
 
+static double GetCurrentProcessCpuUsage()
+{
+	static ULONGLONG s_lastSystemTime = 0;
+	static ULONGLONG s_lastProcessTime = 0;
+	static double s_cpuPercent = 0.0;
+	static DWORD s_numCores = 0;
+
+	if (s_numCores == 0)
+	{
+		SYSTEM_INFO sysInfo;
+		GetSystemInfo(&sysInfo);
+		s_numCores = sysInfo.dwNumberOfProcessors;
+		if (s_numCores == 0) s_numCores = 1;
+	}
+
+	FILETIME ftCreation, ftExit, ftKernel, ftUser, ftNow;
+	GetSystemTimeAsFileTime(&ftNow);
+	if (!GetProcessTimes(GetCurrentProcess(), &ftCreation, &ftExit, &ftKernel, &ftUser))
+	{
+		return 0.0;
+	}
+
+	ULARGE_INTEGER now, kernel, user;
+	now.LowPart = ftNow.dwLowDateTime; now.HighPart = ftNow.dwHighDateTime;
+	kernel.LowPart = ftKernel.dwLowDateTime; kernel.HighPart = ftKernel.dwHighDateTime;
+	user.LowPart = ftUser.dwLowDateTime; user.HighPart = ftUser.dwHighDateTime;
+
+	ULONGLONG currentSystemTime = now.QuadPart;
+	ULONGLONG currentProcessTime = kernel.QuadPart + user.QuadPart;
+
+	if (s_lastSystemTime != 0)
+	{
+		ULONGLONG sysDiff = currentSystemTime - s_lastSystemTime;
+		ULONGLONG procDiff = currentProcessTime - s_lastProcessTime;
+		// Refresh every ~250ms
+		if (sysDiff >= 2500000)
+		{
+			double percent = ((double)procDiff / (double)(sysDiff * s_numCores)) * 100.0;
+			s_cpuPercent = (percent < 0.0) ? 0.0 : ((percent > 100.0) ? 100.0 : percent);
+			s_lastSystemTime = currentSystemTime;
+			s_lastProcessTime = currentProcessTime;
+		}
+	}
+	else
+	{
+		s_lastSystemTime = currentSystemTime;
+		s_lastProcessTime = currentProcessTime;
+	}
+
+	return s_cpuPercent;
+}
+
+static double GetProcessVramUsageMB(char* outAdapterName, size_t nameBufSize)
+{
+	static IDXGIFactory4* s_pFactory = nullptr;
+	static IDXGIAdapter3* s_pAdapter = nullptr;
+	static bool s_inited = false;
+	static char s_adapterName[128] = "GPU";
+
+	if (!s_inited)
+	{
+		s_inited = true;
+		if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&s_pFactory))))
+		{
+			IDXGIAdapter* pAdapt = nullptr;
+			if (SUCCEEDED(s_pFactory->EnumAdapters(0, &pAdapt)))
+			{
+				DXGI_ADAPTER_DESC desc;
+				if (SUCCEEDED(pAdapt->GetDesc(&desc)))
+				{
+					WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, s_adapterName, sizeof(s_adapterName), NULL, NULL);
+				}
+				pAdapt->QueryInterface(IID_PPV_ARGS(&s_pAdapter));
+				pAdapt->Release();
+			}
+		}
+	}
+
+	if (outAdapterName && nameBufSize > 0)
+	{
+		strncpy_s(outAdapterName, nameBufSize, s_adapterName, _TRUNCATE);
+	}
+
+	if (s_pAdapter)
+	{
+		DXGI_QUERY_VIDEO_MEMORY_INFO memInfo = {};
+		if (SUCCEEDED(s_pAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memInfo)))
+		{
+			return (double)memInfo.CurrentUsage / (1024.0 * 1024.0);
+		}
+	}
+	return 0.0;
+}
+
 static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int mode)
 {
-	int boxW = 280;
-	int boxH = 135;
+	int boxW = 310;
+	int boxH = 158;
 	int boxX = width - boxW - 20;
 	int boxY = 20;
 
@@ -240,13 +338,16 @@ static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int m
 
 	// Line 1: Title
 	SetTextColor(hdc, RGB(255, 205, 50));
-	TextOutA(hdc, boxX + 12, boxY + 10, "[F3] PERFORMANCE HUD", 20);
+	TextOutA(hdc, boxX + 12, boxY + 10, "[F5] PERFORMANCE HUD", 20);
 
 	// Metrics
 	DWORD gdiHandles = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
 	PROCESS_MEMORY_COUNTERS pmc = { sizeof(pmc) };
 	GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
 	double ramMB = (double)pmc.WorkingSetSize / (1024.0 * 1024.0);
+	double cpuPercent = GetCurrentProcessCpuUsage();
+	char gpuName[64] = "GPU";
+	double vramMB = GetProcessVramUsageMB(gpuName, sizeof(gpuName));
 
 	char buf[128];
 
@@ -255,7 +356,7 @@ static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int m
 	char modeNameA[64];
 	WideCharToMultiByte(CP_UTF8, 0, g_modeNames[mode], -1, modeNameA, sizeof(modeNameA), NULL, NULL);
 	int len = sprintf_s(buf, "Mode: %s (#%02d)", modeNameA, mode);
-	TextOutA(hdc, boxX + 12, boxY + 32, buf, len);
+	TextOutA(hdc, boxX + 12, boxY + 30, buf, len);
 
 	// Line 3: Render time
 	double lastMs = data->lastRenderTimeMs;
@@ -263,22 +364,28 @@ static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int m
 	COLORREF perfColor = (avgMs > 16.67) ? RGB(255, 90, 90) : (avgMs > 8.0 ? RGB(255, 180, 50) : RGB(80, 230, 120));
 	SetTextColor(hdc, perfColor);
 	len = sprintf_s(buf, "Render: %.2f ms (Avg: %.2f ms)", lastMs, avgMs);
-	TextOutA(hdc, boxX + 12, boxY + 54, buf, len);
+	TextOutA(hdc, boxX + 12, boxY + 50, buf, len);
 
 	// Line 4: FPS
 	double maxFps = (avgMs > 0.001) ? (1000.0 / avgMs) : 9999.0;
 	SetTextColor(hdc, RGB(180, 200, 220));
 	len = sprintf_s(buf, "FPS: %.0f / 30 (Max: %.0f)", data->currentFps, maxFps);
-	TextOutA(hdc, boxX + 12, boxY + 74, buf, len);
+	TextOutA(hdc, boxX + 12, boxY + 70, buf, len);
 
-	// Line 5: Resources (GDI + RAM)
+	// Line 5: CPU & RAM
+	SetTextColor(hdc, RGB(130, 210, 255));
+	len = sprintf_s(buf, "CPU: %.1f%% | RAM: %.1f MB", cpuPercent, ramMB);
+	TextOutA(hdc, boxX + 12, boxY + 90, buf, len);
+
+	// Line 6: GPU & VRAM
+	SetTextColor(hdc, RGB(180, 160, 255));
+	len = sprintf_s(buf, "GPU: ~0%% (GDI) | VRAM: %.1f MB", vramMB);
+	TextOutA(hdc, boxX + 12, boxY + 110, buf, len);
+
+	// Line 7: GDI Handles & Resolution
 	SetTextColor(hdc, RGB(140, 170, 200));
-	len = sprintf_s(buf, "GDI: %lu objs | RAM: %.1f MB", gdiHandles, ramMB);
-	TextOutA(hdc, boxX + 12, boxY + 94, buf, len);
-
-	// Line 6: Resolution
-	len = sprintf_s(buf, "Resolution: %dx%d", width, height);
-	TextOutA(hdc, boxX + 12, boxY + 112, buf, len);
+	len = sprintf_s(buf, "GDI: %lu objs | Res: %dx%d", gdiHandles, width, height);
+	TextOutA(hdc, boxX + 12, boxY + 130, buf, len);
 
 	SelectObject(hdc, oldFont);
 	DeleteObject(hHudFont);
@@ -390,7 +497,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	break;
 	case WM_KEYDOWN:
-		if (wParam == VK_F3) {
+		if (wParam == VK_F5) {
 			g_ShowDebugHUD = !g_ShowDebugHUD;
 			InvalidateRect(hWnd, NULL, FALSE);
 			break;
@@ -414,4 +521,4 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return 0;
 }
-
+

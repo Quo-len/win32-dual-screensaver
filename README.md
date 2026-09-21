@@ -16,37 +16,37 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 
 ## Visual Modes (29 Built-in)
 
-| #   | Mode                     | Description                                                               |
-| --- | ------------------------ | ------------------------------------------------------------------------- |
-| 0   | **Donut**                | Rotating 3D ASCII torus rendered with real-time mathematical illumination |
-| 1   | **Game of Life**         | Conway's Cellular Automata with customizable cell sizes and speed         |
-| 2   | **Matrix**               | Iconic digital rain with glowing green glyphs and fading trails           |
-| 3   | **Earth**                | Real-time rotating ASCII globe rendered with true spherical projection    |
-| 4   | **Blank (Away)**         | Clean black screen showing a retro cowsay message with an away timer      |
-| 5   | **Julia Spirals**        | Smooth, dynamic fractal exploration rendered in real-time                 |
-| 6   | **3D Starfield**         | Warp-speed retro space travel with depth-projected stars                  |
-| 7   | **Bouncing DVD Logo**    | Classic bouncing logo that changes color on every wall collision          |
-| 8   | **Grid**                 | Retro synthwave/cyberpunk perspective grid with flowing horizon           |
-| 9   | **Pong**                 | Autonomous retro ping pong match with ball physics and paddle AI          |
-| 10  | **Maze Generator**       | Procedural labyrinth that generates in real-time and solves itself        |
-| 11  | **Odometer Clock**       | Minimalist mechanical flip/odometer-style digital clock                   |
-| 12  | **Perlin Flow Field**    | Fluid particle trajectories driven by 2D Perlin noise gradients           |
-| 13  | **ASCII Fire**           | Classic Doom-style fire simulation rendered with ASCII density glyphs     |
-| 14  | **Hex Memory Dump**      | Cyberpunk-style animated memory buffer scanner                            |
-| 15  | **Sorting Algorithms**   | Real-time step-by-step visualizations of classic sorting routines         |
-| 16  | **Langton's Ant**        | Multi-agent symmetrical cellular automata creating intricate tapestries   |
-| 17  | **Boids Flocking**       | 150 agents following separation, alignment & cohesion rules with trails   |
-| 18  | **Cyclic CA**            | 16-state cyclic cellular automaton producing perpetual spinning spirals   |
-| 19  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors |
-| 20  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black      |
-| 21  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette         |
-| 22  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing|
-| 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails   |
-| 24  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow|
-| 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression         |
-| 26  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp |
-| 27  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes    |
-| 28  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars |
+| #   | Mode                     | Description                                                                |
+| --- | ------------------------ | -------------------------------------------------------------------------- |
+| 0   | **Donut**                | Rotating 3D ASCII torus rendered with real-time mathematical illumination  |
+| 1   | **Game of Life**         | Conway's Cellular Automata with customizable cell sizes and speed          |
+| 2   | **Matrix**               | Iconic digital rain with glowing green glyphs and fading trails            |
+| 3   | **Earth**                | Real-time rotating ASCII globe rendered with true spherical projection     |
+| 4   | **Blank (Away)**         | Clean black screen showing a retro cowsay message with an away timer       |
+| 5   | **Julia Spirals**        | Smooth, dynamic fractal exploration rendered in real-time                  |
+| 6   | **3D Starfield**         | Warp-speed retro space travel with depth-projected stars                   |
+| 7   | **Bouncing DVD Logo**    | Classic bouncing logo that changes color on every wall collision           |
+| 8   | **Grid**                 | Retro synthwave/cyberpunk perspective grid with flowing horizon            |
+| 9   | **Pong**                 | Autonomous retro ping pong match with ball physics and paddle AI           |
+| 10  | **Maze Generator**       | Procedural labyrinth that generates in real-time and solves itself         |
+| 11  | **Odometer Clock**       | Minimalist mechanical flip/odometer-style digital clock                    |
+| 12  | **Perlin Flow Field**    | Fluid particle trajectories driven by 2D Perlin noise gradients            |
+| 13  | **ASCII Fire**           | Classic Doom-style fire simulation rendered with ASCII density glyphs      |
+| 14  | **Hex Memory Dump**      | Cyberpunk-style animated memory buffer scanner                             |
+| 15  | **Sorting Algorithms**   | Real-time step-by-step visualizations of classic sorting routines          |
+| 16  | **Langton's Ant**        | Multi-agent symmetrical cellular automata creating intricate tapestries    |
+| 17  | **Boids Flocking**       | 150 agents following separation, alignment & cohesion rules with trails    |
+| 18  | **Cyclic CA**            | 16-state cyclic cellular automaton producing perpetual spinning spirals    |
+| 19  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors  |
+| 20  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black       |
+| 21  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette          |
+| 22  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing |
+| 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails    |
+| 24  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow |
+| 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression          |
+| 26  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp   |
+| 27  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
+| 28  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
 
 ---
 
@@ -55,6 +55,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 To have **DualSaver** appear in the official Windows Screen Saver dropdown alongside built-in screensavers (Mystify, Ribbons, etc.):
 
 ### Option A: Download Pre-built Release
+
 Download `DualScreenSaver.scr` directly from the [GitHub Releases](https://github.com/Quo-len/win32-dual-screensaver/releases) page. Right-click the `.scr` file and click **Install**.
 
 ### Option B: Build from Source
@@ -70,16 +71,20 @@ just clean     # Clean intermediate build files
 ```
 
 Or via MSBuild directly:
+
 ```powershell
 msbuild dual-screensaver.slnx /p:Configuration=Release /p:Platform=x64 /v:minimal
 ```
+
 The build automatically generates both `DualScreenSaver.exe` and `DualScreenSaver.scr` in `dual-screensaver\x64\Release\`.
 
 ### Step 2: Copy as `.scr` into `System32` (or Right-Click Install)
 
 You can either:
+
 - **Right-click** `dual-screensaver\x64\Release\DualScreenSaver.scr` and select **Install**.
 - Or run PowerShell **as Administrator** to copy into `System32`:
+
 ```powershell
 Copy-Item ".\dual-screensaver\x64\Release\DualScreenSaver.scr" "C:\Windows\System32\DualScreenSaver.scr" -Force
 ```
@@ -137,18 +142,18 @@ Settings are managed via a dedicated graphical window and saved to the registry:
 
 The screensaver executable supports standard Windows screensaver flags as well as custom switches:
 
-| Flag              | Purpose                                                        | Example                            |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------- |
-| `/s`              | Runs fullscreen screensaver on all monitors (default behavior) | `DualScreenSaver.exe /s`           |
-| `/c`              | Opens the graphical Settings configuration dialog              | `DualScreenSaver.exe /c`           |
-| `/pool`           | Opens the Randomizer Pool checklist dialog directly            | `DualScreenSaver.exe /pool`        |
-| `/p <HWND>`       | Renders preview inside parent window handle                    | `DualScreenSaver.exe /p 123456`    |
-| `/debug`          | Launches with live Performance HUD overlay enabled by default  | `DualScreenSaver.exe /debug`       |
-| `--benchmark`     | Runs headless performance benchmark & GDI leak test on all modes| `DualScreenSaver.exe --benchmark` |
-| `<mode1> [mode2]` | Launch immediately with specific modes by name                 | `DualScreenSaver.exe matrix earth` |
+| Flag              | Purpose                                                          | Example                            |
+| ----------------- | ---------------------------------------------------------------- | ---------------------------------- |
+| `/s`              | Runs fullscreen screensaver on all monitors (default behavior)   | `DualScreenSaver.exe /s`           |
+| `/c`              | Opens the graphical Settings configuration dialog                | `DualScreenSaver.exe /c`           |
+| `/pool`           | Opens the Randomizer Pool checklist dialog directly              | `DualScreenSaver.exe /pool`        |
+| `/p <HWND>`       | Renders preview inside parent window handle                      | `DualScreenSaver.exe /p 123456`    |
+| `/debug`          | Launches with live Performance HUD overlay enabled by default    | `DualScreenSaver.exe /debug`       |
+| `--benchmark`     | Runs headless performance benchmark & GDI leak test on all modes | `DualScreenSaver.exe --benchmark`  |
+| `<mode1> [mode2]` | Launch immediately with specific modes by name                   | `DualScreenSaver.exe matrix earth` |
 
 > [!TIP]
-> **Live Diagnostics HUD**: Press **`F3`** at any time while the screensaver is running to toggle the real-time Performance HUD (frame time latency in ms, FPS capacity, GDI handle count, and memory usage).
+> **Live Diagnostics HUD**: Press **`F5`** at any time while the screensaver is running to toggle the real-time Performance HUD (frame time latency in ms, FPS capacity, GDI handle count, and memory usage).
 
 ### Supported Mode Names for CLI Launch
 

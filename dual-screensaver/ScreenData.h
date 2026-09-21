@@ -53,7 +53,7 @@ struct ScreenData {
     std::vector<unsigned char> matrixIntensity;
     HFONT hMatrixFont = NULL;
 
-    DWORD startTime = 0;
+    ULONGLONG startTime = 0;
 
     struct Star { float x, y, z; };
     std::vector<Star> stars;

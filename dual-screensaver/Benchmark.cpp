@@ -21,45 +21,44 @@ struct BenchResult {
 	double maxMs;
 	double p95Ms;
 	double maxFps;
+	double ramMB;
+	double cpuPercent;
 	int gdiLeaks;
 	bool passed;
-	const char* status;
+	std::string status;
 };
 
 int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 {
-	HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (hStdOut == INVALID_HANDLE_VALUE || hStdOut == NULL || GetFileType(hStdOut) != FILE_TYPE_PIPE) {
-		if (AttachConsole(ATTACH_PARENT_PROCESS)) {
-			FILE* fpOut;
-			FILE* fpErr;
-			freopen_s(&fpOut, "CONOUT$", "w", stdout);
-			freopen_s(&fpErr, "CONOUT$", "w", stderr);
-		}
-	}
+	AllocConsole();
+	FILE* fDummy;
+	freopen_s(&fDummy, "CONOUT$", "w", stdout);
+	freopen_s(&fDummy, "CONOUT$", "w", stderr);
 
-	SetConsoleOutputCP(CP_UTF8);
+	std::ofstream outFile("benchmark_report.txt", std::ios::out | std::ios::trunc);
 
-	std::ofstream reportFile("benchmark_report.txt", std::ios::out | std::ios::trunc);
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo(&sysInfo);
+	DWORD numCores = sysInfo.dwNumberOfProcessors ? sysInfo.dwNumberOfProcessors : 1;
 
 	auto logBoth = [&](const std::string& text) {
 		std::cout << text;
-		if (reportFile.is_open()) {
-			reportFile << text;
-			reportFile.flush();
+		if (outFile.is_open()) {
+			outFile << text;
+			outFile.flush();
 		}
 		OutputDebugStringA(text.c_str());
 	};
 
 	std::stringstream header;
 	header << "\n"
-	       << "========================================================================================\n"
-	       << "                 DUAL SCREENSAVER HEADLESS PERFORMANCE BENCHMARK                        \n"
-	       << "                  Resolution: " << width << "x" << height 
-	       << " | Frames: " << benchFrames << " (" << warmupFrames << " warmup)\n"
-	       << "========================================================================================\n"
-	       << " #   Renderer Name                 Avg (ms)   P95 (ms)   Max FPS  GDI Leaks  Status     \n"
-	       << "----------------------------------------------------------------------------------------\n";
+	       << "==========================================================================================================\n"
+	       << "                             DUAL SCREENSAVER HEADLESS PERFORMANCE BENCHMARK                              \n"
+	       << "                Resolution: " << width << "x" << height 
+	       << " | Frames: " << benchFrames << " (" << warmupFrames << " warmup) | Engine: Win32 GDI (0% GPU)\n"
+	       << "==========================================================================================================\n"
+	       << " #   Renderer Name                 Avg (ms)   P95 (ms)   Max FPS   CPU %     RAM (MB)   GDI Leaks  Status     \n"
+	       << "----------------------------------------------------------------------------------------------------------\n";
 	logBoth(header.str());
 
 	HDC screenDC = GetDC(NULL);
@@ -108,6 +107,9 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 		DWORD gdiMidPoint = 0;
 		int halfFrames = benchFrames / 2;
 
+		FILETIME ftCreate, ftExit, k0, u0, k1, u1;
+		GetProcessTimes(GetCurrentProcess(), &ftCreate, &ftExit, &k0, &u0);
+
 		for (int f = 0; f < benchFrames; ++f) {
 			if (f == halfFrames) {
 				gdiMidPoint = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
@@ -125,7 +127,26 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 			if (ms > maxMs) maxMs = ms;
 		}
 
+		GetProcessTimes(GetCurrentProcess(), &ftCreate, &ftExit, &k1, &u1);
 		DWORD gdiAfterBench = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+
+		// Compute RAM
+		PROCESS_MEMORY_COUNTERS pmc = { sizeof(pmc) };
+		GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+		double ramMB = (double)pmc.WorkingSetSize / (1024.0 * 1024.0);
+
+		// Compute CPU utilization % during the loop
+		ULARGE_INTEGER ku0, uu0, ku1, uu1;
+		ku0.LowPart = k0.dwLowDateTime; ku0.HighPart = k0.dwHighDateTime;
+		uu0.LowPart = u0.dwLowDateTime; uu0.HighPart = u0.dwHighDateTime;
+		ku1.LowPart = k1.dwLowDateTime; ku1.HighPart = k1.dwHighDateTime;
+		uu1.LowPart = u1.dwLowDateTime; uu1.HighPart = u1.dwHighDateTime;
+
+		ULONGLONG proc100ns = (ku1.QuadPart - ku0.QuadPart) + (uu1.QuadPart - uu0.QuadPart);
+		double procMs = (double)proc100ns / 10000.0;
+		double cpuPercent = (totalMs > 0.0) ? ((procMs / totalMs) * 100.0 / (double)numCores) : 0.0;
+		double maxSingleCore = 100.0 / (double)numCores;
+		if (cpuPercent > maxSingleCore) cpuPercent = maxSingleCore;
 
 		// 3. Cleanup ScreenData
 		if (data->hFont) DeleteObject(data->hFont);
@@ -153,6 +174,8 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 		res.maxMs = maxMs;
 		res.p95Ms = p95Ms;
 		res.maxFps = maxFps;
+		res.ramMB = ramMB;
+		res.cpuPercent = cpuPercent;
 		res.gdiLeaks = sustainedLeak;
 
 		if (sustainedLeak > 0) {
@@ -180,7 +203,9 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 		     << std::setw(7) << avgMs << " ms"
 		     << std::setw(8) << p95Ms << " ms"
 		     << std::setw(9) << (int)maxFps
-		     << std::setw(10) << res.gdiLeaks << "  "
+		     << std::setw(7) << std::setprecision(1) << cpuPercent << " %"
+		     << std::setw(8) << std::setprecision(1) << ramMB << " MB"
+		     << std::setw(11) << res.gdiLeaks << "  "
 		     << std::left << std::setw(10) << res.status
 		     << "\n";
 		logBoth(line.str());
@@ -196,12 +221,12 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 
 	// Summary
 	std::stringstream summary;
-	summary << "----------------------------------------------------------------------------------------\n"
+	summary << "----------------------------------------------------------------------------------------------------------\n"
 	        << " Summary: " << g_numScreensavers << " screensavers tested | "
 	        << (g_numScreensavers - totalFails) << " Passed | "
 	        << totalFails << " Failed | Duration: "
 	        << std::fixed << std::setprecision(2) << totalDurationSec << "s\n"
-	        << "========================================================================================\n\n";
+	        << "==========================================================================================================\n\n";
 	logBoth(summary.str());
 
 	return (totalFails == 0) ? 0 : 1;
