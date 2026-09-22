@@ -32,6 +32,8 @@ typedef void (*RenderCtxFn)(const RenderContext& ctx);
 // Legacy render function signature for backward compatibility
 typedef void (*RenderLegacyFn)(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 
+#include "settings/SettingItem.h"
+
 // Metadata & execution descriptor for a screensaver
 struct ScreensaverDef {
     int id;
@@ -39,6 +41,7 @@ struct ScreensaverDef {
     const char* codeName;
     std::vector<std::string> aliases;
     RenderCtxFn render;
+    std::vector<SettingItem> settings;
 };
 
 namespace ScreensaverRegistry {

@@ -1,7 +1,7 @@
 #include "framework.h"
 #include "Renderers.h"
 #include "Settings.h"
-#include "Perlin.h"
+#include "../utils/Perlin.h"
 #include <math.h>
 
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {

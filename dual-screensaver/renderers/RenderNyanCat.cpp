@@ -8,7 +8,7 @@
 
 #include "framework.h"
 #include "Renderers.h"
-#include "NyanCatFrames.h"
+#include "../assets/NyanCatFrames.h"
 #include <vector>
 #include <string>
 #include <cstdio>

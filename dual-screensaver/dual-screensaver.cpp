@@ -4,7 +4,7 @@
 #include "ConfigUI.h"
 #include "Settings.h"
 #include "ScreenData.h"
-#include "Perlin.h"
+#include "utils/Perlin.h"
 #include "Renderers.h"
 #include "Benchmark.h"
 #include <stdio.h>

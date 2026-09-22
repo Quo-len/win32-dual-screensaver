@@ -1,6 +1,7 @@
 #include "ConfigUI.h"
 #include "Settings.h"
 #include "Defaults.h"
+#include "ScreensaverRegistry.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,21 +12,11 @@ extern HINSTANCE hInst;
 #define IDAPPLY_MAIN 2200
 #define IDAPPLY_SUB 2300
 #define IDRESET_SUB 2301
+#define IDC_SUB_EDIT_BASE 3100
 
 bool HasSettings(int id) {
-	switch (id) {
-	case 0: return true; // Donut
-	case 1: return true; // GoL
-	case 3: return true; // Earth
-	case 7: return true; // DVD
-	case 9: return true; // Pong
-	case 10: return true; // Maze
-	case 11: return true; // Clock
-	case 12: return true; // Perlin
-	case 16: return true; // Langton's Ant
-	case 21: return true; // Curl Noise Particles
-	default: return false;
-	}
+	const auto* def = ScreensaverRegistry::GetById(id);
+	return def && !def->settings.empty();
 }
 
 LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -56,45 +47,20 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			y += rowH;
 		};
 
-		char buf[32];
-		switch (ss_id) {
-		case 0:
-			sprintf_s(buf, "%.3f", g_ASpeed); createRow(L"A Speed:", IDC_EDIT_ASPEED, buf);
-			sprintf_s(buf, "%.3f", g_BSpeed); createRow(L"B Speed:", IDC_EDIT_BSPEED, buf);
-			sprintf_s(buf, "%.1f", g_DonutSize); createRow(L"Donut Size:", IDC_EDIT_SIZE, buf);
-			sprintf_s(buf, "%.1f", g_DonutDistance); createRow(L"Distance:", IDC_EDIT_DONUT_DISTANCE, buf);
-			break;
-		case 1:
-			sprintf_s(buf, "%d", g_GolCellSize); createRow(L"Cell (px):", IDC_EDIT_GOL_SIZE, buf);
-			sprintf_s(buf, "%d", g_GolSpeed); createRow(L"Speed (ms):", IDC_EDIT_GOL_SPEED, buf);
-			break;
-		case 3:
-			sprintf_s(buf, "%.3f", g_EarthSpeed); createRow(L"Spin:", IDC_EDIT_EARTH_SPEED, buf);
-			break;
-		case 7:
-			sprintf_s(buf, "%.1f", g_DvdSpeed); createRow(L"Speed:", IDC_EDIT_DVD_SPEED, buf);
-			break;
-		case 9:
-			sprintf_s(buf, "%.1f", g_PongSpeed); createRow(L"Speed:", IDC_EDIT_PONG_SPEED, buf);
-			break;
-		case 10:
-			sprintf_s(buf, "%.1f", g_MazeBuildSpeed); createRow(L"Build Spd:", IDC_EDIT_MAZE_BUILD_SPEED, buf);
-			sprintf_s(buf, "%.1f", g_MazeSolveSpeed); createRow(L"Solve Spd:", IDC_EDIT_MAZE_SOLVE_SPEED, buf);
-			break;
-		case 11:
-			sprintf_s(buf, "%d", g_TextSize); createRow(L"Text Size:", IDC_EDIT_TEXTSIZE, buf);
-			break;
-		case 12:
-			sprintf_s(buf, "%.4f", g_PerlinScale); createRow(L"Scale:", IDC_EDIT_PERLIN_SCALE, buf);
-			sprintf_s(buf, "%.2f", g_PerlinSpeed); createRow(L"Speed:", IDC_EDIT_PERLIN_SPEED, buf);
-			break;
-		case 16:
-			sprintf_s(buf, "%d", g_AntCount); createRow(L"Sets (Sym):", IDC_EDIT_ANT_COUNT, buf);
-			sprintf_s(buf, "%d", g_AntSpeed); createRow(L"Speed:", IDC_EDIT_ANT_SPEED, buf);
-			break;
-		case 21:
-			sprintf_s(buf, "%d", g_CurlCount); createRow(L"Particles:", IDC_EDIT_CURL_COUNT, buf);
-			break;
+		const auto* def = ScreensaverRegistry::GetById(ss_id);
+		if (def) {
+			int editId = IDC_SUB_EDIT_BASE;
+			char buf[64];
+			for (const auto& item : def->settings) {
+				if (item.type == SettingType::Int) {
+					sprintf_s(buf, "%d", *(int*)item.valPtr);
+				} else if (item.type == SettingType::Float) {
+					sprintf_s(buf, "%.*f", item.precision, *(float*)item.valPtr);
+				} else if (item.type == SettingType::Bool) {
+					sprintf_s(buf, "%d", *(bool*)item.valPtr ? 1 : 0);
+				}
+				createRow(item.label, editId++, buf);
+			}
 		}
 
 		y += 10;
@@ -115,90 +81,45 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 		if (LOWORD(wParam) == IDAPPLY_SUB)
 		{
 			int ss_id = (int)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-			char buf[32];
-			auto getFloat = [&](int id, float& val) { if (GetDlgItemTextA(hWnd, id, buf, 32)) val = (float)atof(buf); };
-			auto getInt = [&](int id, int& val) { if (GetDlgItemTextA(hWnd, id, buf, 32)) val = atoi(buf); };
-
-			switch (ss_id) {
-			case 0:
-				getFloat(IDC_EDIT_ASPEED, g_ASpeed); getFloat(IDC_EDIT_BSPEED, g_BSpeed);
-				getFloat(IDC_EDIT_SIZE, g_DonutSize); getFloat(IDC_EDIT_DONUT_DISTANCE, g_DonutDistance);
-				break;
-			case 1:
-				getInt(IDC_EDIT_GOL_SIZE, g_GolCellSize); getInt(IDC_EDIT_GOL_SPEED, g_GolSpeed);
-				if (g_GolCellSize < 1) g_GolCellSize = 1;
-				if (g_GolSpeed < 10) g_GolSpeed = 10;
-				break;
-			case 3: getFloat(IDC_EDIT_EARTH_SPEED, g_EarthSpeed); break;
-			case 7: getFloat(IDC_EDIT_DVD_SPEED, g_DvdSpeed); break;
-			case 9: getFloat(IDC_EDIT_PONG_SPEED, g_PongSpeed); break;
-			case 10:
-				getFloat(IDC_EDIT_MAZE_BUILD_SPEED, g_MazeBuildSpeed); getFloat(IDC_EDIT_MAZE_SOLVE_SPEED, g_MazeSolveSpeed);
-				if (g_MazeBuildSpeed < 1.0f) g_MazeBuildSpeed = 1.0f;
-				if (g_MazeSolveSpeed < 1.0f) g_MazeSolveSpeed = 1.0f;
-				break;
-			case 11: getInt(IDC_EDIT_TEXTSIZE, g_TextSize); break;
-			case 12:
-				getFloat(IDC_EDIT_PERLIN_SCALE, g_PerlinScale); getFloat(IDC_EDIT_PERLIN_SPEED, g_PerlinSpeed);
-				if (g_PerlinSpeed < 0.0f) g_PerlinSpeed = 0.1f;
-				break;
-			case 16:
-				getInt(IDC_EDIT_ANT_COUNT, g_AntCount); getInt(IDC_EDIT_ANT_SPEED, g_AntSpeed);
-				if (g_AntCount < 1) g_AntCount = 1;
-				if (g_AntSpeed < 1) g_AntSpeed = 1;
-				break;
-			case 21:
-				getInt(IDC_EDIT_CURL_COUNT, g_CurlCount);
-				if (g_CurlCount < 100) g_CurlCount = 100;
-				if (g_CurlCount > 500000) g_CurlCount = 500000;
-				break;
+			const auto* def = ScreensaverRegistry::GetById(ss_id);
+			if (def) {
+				int editId = IDC_SUB_EDIT_BASE;
+				char buf[64];
+				for (const auto& item : def->settings) {
+					if (GetDlgItemTextA(hWnd, editId++, buf, sizeof(buf))) {
+						double v = atof(buf);
+						if (v < item.minVal) v = item.minVal;
+						if (v > item.maxVal) v = item.maxVal;
+						if (item.type == SettingType::Int) *(int*)item.valPtr = (int)v;
+						else if (item.type == SettingType::Float) *(float*)item.valPtr = (float)v;
+						else if (item.type == SettingType::Bool) *(bool*)item.valPtr = (v != 0.0);
+					}
+				}
+				SaveSettings();
 			}
-			SaveSettings();
 		}
 		else if (LOWORD(wParam) == IDRESET_SUB)
 		{
 			int ss_id = (int)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-			char buf[32];
-			switch (ss_id) {
-			case 0:
-				g_ASpeed = DEFAULT_ASPEED; sprintf_s(buf, "%.3f", g_ASpeed); SetDlgItemTextA(hWnd, IDC_EDIT_ASPEED, buf);
-				g_BSpeed = DEFAULT_BSPEED; sprintf_s(buf, "%.3f", g_BSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_BSPEED, buf);
-				g_DonutSize = DEFAULT_DONUTSIZE; sprintf_s(buf, "%.1f", g_DonutSize); SetDlgItemTextA(hWnd, IDC_EDIT_SIZE, buf);
-				g_DonutDistance = DEFAULT_DONUTDISTANCE; sprintf_s(buf, "%.1f", g_DonutDistance); SetDlgItemTextA(hWnd, IDC_EDIT_DONUT_DISTANCE, buf);
-				break;
-			case 1:
-				g_GolCellSize = DEFAULT_GOLCELLSIZE; sprintf_s(buf, "%d", g_GolCellSize); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SIZE, buf);
-				g_GolSpeed = DEFAULT_GOLSPEED; sprintf_s(buf, "%d", g_GolSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_GOL_SPEED, buf);
-				break;
-			case 3:
-				g_EarthSpeed = DEFAULT_EARTHSPEED; sprintf_s(buf, "%.3f", g_EarthSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_EARTH_SPEED, buf);
-				break;
-			case 7:
-				g_DvdSpeed = DEFAULT_DVDSPEED; sprintf_s(buf, "%.1f", g_DvdSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_DVD_SPEED, buf);
-				break;
-			case 9:
-				g_PongSpeed = DEFAULT_PONGSPEED; sprintf_s(buf, "%.1f", g_PongSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_PONG_SPEED, buf);
-				break;
-			case 10:
-				g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED; sprintf_s(buf, "%.1f", g_MazeBuildSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_BUILD_SPEED, buf);
-				g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED; sprintf_s(buf, "%.1f", g_MazeSolveSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_MAZE_SOLVE_SPEED, buf);
-				break;
-			case 11:
-				g_TextSize = DEFAULT_TEXTSIZE; sprintf_s(buf, "%d", g_TextSize); SetDlgItemTextA(hWnd, IDC_EDIT_TEXTSIZE, buf);
-				break;
-			case 12:
-				g_PerlinScale = DEFAULT_PERLINSCALE; sprintf_s(buf, "%.4f", g_PerlinScale); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SCALE, buf);
-				g_PerlinSpeed = DEFAULT_PERLINSPEED; sprintf_s(buf, "%.2f", g_PerlinSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_PERLIN_SPEED, buf);
-				break;
-			case 16:
-				g_AntCount = DEFAULT_ANT_COUNT; sprintf_s(buf, "%d", g_AntCount); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf);
-				g_AntSpeed = DEFAULT_ANT_SPEED; sprintf_s(buf, "%d", g_AntSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf);
-				break;
-			case 21:
-				g_CurlCount = DEFAULT_CURL_COUNT; sprintf_s(buf, "%d", g_CurlCount); SetDlgItemTextA(hWnd, IDC_EDIT_CURL_COUNT, buf);
-				break;
+			const auto* def = ScreensaverRegistry::GetById(ss_id);
+			if (def) {
+				int editId = IDC_SUB_EDIT_BASE;
+				char buf[64];
+				for (const auto& item : def->settings) {
+					if (item.type == SettingType::Int) {
+						*(int*)item.valPtr = (int)item.defVal;
+						sprintf_s(buf, "%d", (int)item.defVal);
+					} else if (item.type == SettingType::Float) {
+						*(float*)item.valPtr = (float)item.defVal;
+						sprintf_s(buf, "%.*f", item.precision, (float)item.defVal);
+					} else if (item.type == SettingType::Bool) {
+						*(bool*)item.valPtr = (item.defVal != 0.0);
+						sprintf_s(buf, "%d", (item.defVal != 0.0) ? 1 : 0);
+					}
+					SetDlgItemTextA(hWnd, editId++, buf);
+				}
+				SaveSettings();
 			}
-			SaveSettings();
 		}
 		break;
 	case WM_CLOSE:

@@ -124,10 +124,14 @@ static void LoadBadAppleData(ScreenData* data) {
 
     // 3. Fallback to developer script paths
     std::vector<std::wstring> searchCandidates = {
+        modDir + L"\\assets\\bad_apple.bin",
+        modDir + L"\\..\\assets\\bad_apple.bin",
+        modDir + L"\\..\\..\\assets\\bad_apple.bin",
         modDir + L"\\..\\bad_apple.bin",
         modDir + L"\\..\\..\\bad_apple.bin",
         modDir + L"\\..\\..\\scripts\\bad_apple.bin",
         modDir + L"\\scripts\\bad_apple.bin",
+        L"assets\\bad_apple.bin",
         L"bad_apple.bin",
         L"scripts\\bad_apple.bin",
         L"..\\scripts\\bad_apple.bin"
