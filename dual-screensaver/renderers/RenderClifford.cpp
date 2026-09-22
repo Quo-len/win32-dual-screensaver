@@ -1,22 +1,32 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <math.h>
 
 #ifndef max
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
+struct CliffordState {
+    double t = 0.0;
+    double x = 0.1;
+    double y = 0.1;
+    DWORD lastTick = 0;
+};
+
 void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
+
+    auto& state = data->GetCustomState<CliffordState>(20);
 
     if (data->cols != width || data->rows != height || data->pixels.empty()) {
         data->cols = width;
         data->rows = height;
         data->pixels.assign(width * height, 0xFF000000);
-        data->cliffordT = 0.0;
-        data->cliffordX = 0.1;
-        data->cliffordY = 0.1;
-        data->cliffordLastTick = GetTickCount();
+        state.t = 0.0;
+        state.x = 0.1;
+        state.y = 0.1;
+        state.lastTick = GetTickCount();
     }
 
     uint32_t* px = data->pixels.data();
@@ -39,13 +49,13 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
 
     // Time-based parameter animation
     DWORD now = GetTickCount();
-    double dtMs = (double)(int)(now - data->cliffordLastTick);
-    data->cliffordLastTick = now;
+    double dtMs = (double)(int)(now - state.lastTick);
+    state.lastTick = now;
     if (dtMs < 0.0) dtMs = 0.0;
     if (dtMs > 200.0) dtMs = 200.0;
 
-    data->cliffordT += dtMs * 0.0001; // extremely slow change
-    double t = data->cliffordT;
+    state.t += dtMs * 0.0001; // extremely slow change
+    double t = state.t;
 
     // Mutating parameters A, B, C, D
     double a = 1.4 + 0.3 * sin(t * 0.7);
@@ -57,8 +67,8 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
     double extX = 1.0 + fabs(c) + 0.2;
     double extY = 1.0 + fabs(d) + 0.2;
 
-    double x = data->cliffordX;
-    double y = data->cliffordY;
+    double x = state.x;
+    double y = state.y;
 
     int iters = 30000; // Lower iterations to maintain frame rate and prevent blowing out colors
     
@@ -97,8 +107,8 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
     }
     
     // Save state for next frame to continue orbit
-    data->cliffordX = x;
-    data->cliffordY = y;
+    state.x = x;
+    state.y = y;
 
     // Render buffer to screen
     BITMAPINFO bmi = { 0 };
@@ -112,3 +122,5 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
     StretchDIBits(memDC, 0, 0, width, height,
         0, 0, width, height, px, &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(20, L"Clifford Attractor", "clifford", { "clifford", "attractor" }, WRAP_LEGACY(RenderClifford), {});

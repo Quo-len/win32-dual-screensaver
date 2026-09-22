@@ -1,9 +1,35 @@
-#include "Renderers.h"
+#include "framework.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "resource.h"
 #include <vector>
 #include <string>
 #include <fstream>
 #include <algorithm>
+
+struct BadAppleState {
+    bool loaded = false;
+    bool loadAttempted = false;
+    DWORD startTime = 0;
+    int totalFrames = 0;
+    int width = 0;
+    int height = 0;
+    int fps = 30;
+    int levels = 16;
+    uint32_t dataOffset = 0;
+    std::vector<uint32_t> offsets;
+    std::vector<uint8_t> rleData;
+    std::vector<uint8_t> frameBuffer;
+    HFONT font = nullptr;
+    int fontHeight = 0;
+
+    ~BadAppleState() {
+        if (font) {
+            DeleteObject(font);
+            font = nullptr;
+        }
+    }
+};
 
 #pragma pack(push, 1)
 struct BapHeader {
@@ -34,7 +60,7 @@ static std::wstring GetModuleDir() {
     return std::wstring(path);
 }
 
-static bool TryLoadBapData(const uint8_t* pData, size_t dataSize, ScreenData* data) {
+static bool TryLoadBapData(const uint8_t* pData, size_t dataSize, BadAppleState& state) {
     if (dataSize < sizeof(BapHeader)) {
         return false;
     }
@@ -51,51 +77,55 @@ static bool TryLoadBapData(const uint8_t* pData, size_t dataSize, ScreenData* da
         return false;
     }
 
-    data->badAppleTotalFrames = header->totalFrames;
-    data->badAppleWidth = header->width;
-    data->badAppleHeight = header->height;
-    data->badAppleFPS = header->fps;
-    data->badAppleLevels = header->levels > 0 ? header->levels : 16;
-    data->badAppleDataOffset = header->dataOffset;
+    state.totalFrames = header->totalFrames;
+    state.width = header->width;
+    state.height = header->height;
+    state.fps = header->fps;
+    state.levels = header->levels > 0 ? header->levels : 16;
+    state.dataOffset = header->dataOffset;
 
     // Read offsets table
-    data->badAppleOffsets.resize(header->totalFrames);
-    memcpy(data->badAppleOffsets.data(), pData + sizeof(BapHeader), offsetsByteSize);
+    state.offsets.resize(header->totalFrames);
+    memcpy(state.offsets.data(), pData + sizeof(BapHeader), offsetsByteSize);
 
     // Read RLE data
     size_t rleSize = dataSize - minExpected;
-    data->badAppleRleData.resize(rleSize);
+    state.rleData.resize(rleSize);
     if (rleSize > 0) {
-        memcpy(data->badAppleRleData.data(), pData + minExpected, rleSize);
+        memcpy(state.rleData.data(), pData + minExpected, rleSize);
     }
 
-    // Allocate frame decode buffer
-    data->badAppleFrameBuffer.assign((size_t)header->width * header->height, 0);
+    // Pre-allocate frame buffer
+    state.frameBuffer.assign((size_t)header->width * header->height, 0);
 
-    data->badAppleStartTime = GetTickCount();
-    data->badAppleLoaded = true;
+    state.startTime = GetTickCount();
+    state.loaded = true;
     return true;
 }
 
-static bool TryLoadFromResource(ScreenData* data) {
-    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BAD_APPLE_BIN), RT_RCDATA);
+static bool TryLoadFromResource(BadAppleState& state) {
+    HMODULE hMod = GetModuleHandle(NULL);
+    HRSRC hRes = FindResource(hMod, MAKEINTRESOURCE(IDR_BAD_APPLE_BIN), RT_RCDATA);
     if (!hRes) return false;
-    HGLOBAL hMem = LoadResource(NULL, hRes);
+
+    HGLOBAL hMem = LoadResource(hMod, hRes);
     if (!hMem) return false;
-    DWORD size = SizeofResource(NULL, hRes);
-    const void* ptr = LockResource(hMem);
-    if (!ptr || size == 0) return false;
-    return TryLoadBapData(reinterpret_cast<const uint8_t*>(ptr), (size_t)size, data);
+
+    DWORD resSize = SizeofResource(hMod, hRes);
+    const void* pData = LockResource(hMem);
+    if (!pData || resSize == 0) return false;
+
+    return TryLoadBapData(reinterpret_cast<const uint8_t*>(pData), (size_t)resSize, state);
 }
 
-static bool TryLoadBapFile(const std::wstring& filePath, ScreenData* data) {
+static bool TryLoadBapFile(const std::wstring& filePath, BadAppleState& state) {
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
         return false;
     }
 
     std::streamsize fileSize = file.tellg();
-    if (fileSize < (std::streamsize)sizeof(BapHeader)) {
+    if (fileSize <= 0) {
         return false;
     }
 
@@ -103,22 +133,22 @@ static bool TryLoadBapFile(const std::wstring& filePath, ScreenData* data) {
     std::vector<uint8_t> buffer((size_t)fileSize);
     file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
 
-    return TryLoadBapData(buffer.data(), buffer.size(), data);
+    return TryLoadBapData(buffer.data(), buffer.size(), state);
 }
 
-static void LoadBadAppleData(ScreenData* data) {
-    if (data->badAppleLoadAttempted) return;
-    data->badAppleLoadAttempted = true;
+static void LoadBadAppleData(BadAppleState& state) {
+    if (state.loadAttempted) return;
+    state.loadAttempted = true;
 
     // 1. Check if external bad_apple.bin exists right next to the executable (allows custom video overrides)
     std::wstring modDir = GetModuleDir();
     std::wstring directPath = modDir + L"\\bad_apple.bin";
-    if (TryLoadBapFile(directPath, data)) {
+    if (TryLoadBapFile(directPath, state)) {
         return;
     }
 
     // 2. Load embedded resource directly inside .exe (fully self-contained screensaver)
-    if (TryLoadFromResource(data)) {
+    if (TryLoadFromResource(state)) {
         return;
     }
 
@@ -138,22 +168,24 @@ static void LoadBadAppleData(ScreenData* data) {
     };
 
     for (const auto& candidate : searchCandidates) {
-        if (TryLoadBapFile(candidate, data)) {
+        if (TryLoadBapFile(candidate, state)) {
             break;
         }
     }
 }
 
 void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<BadAppleState>(23);
+
     // Fill entire screen with solid black
     HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
     FillRect(memDC, &rect, blackBrush);
 
-    if (!data->badAppleLoaded) {
-        LoadBadAppleData(data);
+    if (!state.loaded) {
+        LoadBadAppleData(state);
     }
 
-    if (!data->badAppleLoaded) {
+    if (!state.loaded) {
         // Display graceful error/setup message
         SetBkMode(memDC, TRANSPARENT);
         SetTextColor(memDC, RGB(220, 50, 50));
@@ -176,24 +208,24 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
         return;
     }
 
-    int cols = data->badAppleWidth;
-    int rows = data->badAppleHeight;
-    if (cols <= 0 || rows <= 0 || data->badAppleTotalFrames <= 0) return;
+    int cols = state.width;
+    int rows = state.height;
+    if (cols <= 0 || rows <= 0 || state.totalFrames <= 0) return;
 
     // Advance frame based on elapsed time and framerate (seamless looping)
     DWORD now = GetTickCount();
-    if (data->badAppleStartTime == 0) {
-        data->badAppleStartTime = now;
+    if (state.startTime == 0) {
+        state.startTime = now;
     }
-    DWORD elapsed = now - data->badAppleStartTime;
-    int frameIdx = (int)(((uint64_t)elapsed * (uint64_t)data->badAppleFPS) / 1000ULL) % data->badAppleTotalFrames;
+    DWORD elapsed = now - state.startTime;
+    int frameIdx = (int)(((uint64_t)elapsed * (uint64_t)state.fps) / 1000ULL) % state.totalFrames;
 
     // Decode RLE frame
-    uint32_t offset = data->badAppleOffsets[frameIdx];
-    if (offset < data->badAppleRleData.size()) {
-        const uint8_t* ptr = data->badAppleRleData.data() + offset;
-        const uint8_t* endPtr = data->badAppleRleData.data() + data->badAppleRleData.size();
-        uint8_t* dst = data->badAppleFrameBuffer.data();
+    uint32_t offset = state.offsets[frameIdx];
+    if (offset < state.rleData.size()) {
+        const uint8_t* ptr = state.rleData.data() + offset;
+        const uint8_t* endPtr = state.rleData.data() + state.rleData.size();
+        uint8_t* dst = state.frameBuffer.data();
         int target = cols * rows;
         int decoded = 0;
 
@@ -212,19 +244,19 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
     int maxFontHByScreenW = (int)(width / (cols * 0.58f));
     int fontH = (std::max)(4, (std::min)(maxFontHByScreenH, maxFontHByScreenW));
 
-    if (!data->badAppleFont || data->badAppleFontHeight != fontH) {
-        if (data->badAppleFont) {
-            DeleteObject(data->badAppleFont);
+    if (!state.font || state.fontHeight != fontH) {
+        if (state.font) {
+            DeleteObject(state.font);
         }
-        data->badAppleFont = CreateFontW(
+        state.font = CreateFontW(
             fontH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, L"Consolas"
         );
-        data->badAppleFontHeight = fontH;
+        state.fontHeight = fontH;
     }
 
-    HGDIOBJ oldFont = SelectObject(memDC, data->badAppleFont);
+    HGDIOBJ oldFont = SelectObject(memDC, state.font);
 
     TEXTMETRICW tm;
     GetTextMetricsW(memDC, &tm);
@@ -235,14 +267,14 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
     while ((charW * cols > width || charH * rows > height) && fontH > 3) {
         fontH--;
         SelectObject(memDC, oldFont);
-        DeleteObject(data->badAppleFont);
-        data->badAppleFont = CreateFontW(
+        DeleteObject(state.font);
+        state.font = CreateFontW(
             fontH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, L"Consolas"
         );
-        data->badAppleFontHeight = fontH;
-        oldFont = SelectObject(memDC, data->badAppleFont);
+        state.fontHeight = fontH;
+        oldFont = SelectObject(memDC, state.font);
         GetTextMetricsW(memDC, &tm);
         charW = tm.tmAveCharWidth;
         charH = tm.tmHeight;
@@ -258,7 +290,7 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
     SetTextColor(memDC, RGB(235, 235, 235));
 
     std::vector<char> lineBuf(cols + 1, ' ');
-    const uint8_t* frameBuf = data->badAppleFrameBuffer.data();
+    const uint8_t* frameBuf = state.frameBuffer.data();
 
     for (int y = 0; y < rows; ++y) {
         const uint8_t* rowSrc = frameBuf + (y * cols);
@@ -272,3 +304,13 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
 
     SelectObject(memDC, oldFont);
 }
+
+REGISTER_SCREENSAVER(
+    23,
+    L"Bad Apple (ASCII)",
+    "badapple",
+    { "badapple", "bad-apple", "apple", "ascii" },
+    WRAP_LEGACY(RenderBadApple),
+    {}
+);
+

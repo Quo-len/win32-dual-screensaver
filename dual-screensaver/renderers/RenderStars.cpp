@@ -1,17 +1,25 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
+
+struct StarState {
+    struct Star { float x, y, z; };
+    std::vector<Star> stars;
+};
 
 void RenderStars(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    if (data->stars.empty()) {
-        data->stars.resize(800);
-        for (auto& s : data->stars) {
+    auto& state = data->GetCustomState<StarState>(6);
+
+    if (state.stars.empty()) {
+        state.stars.resize(800);
+        for (auto& s : state.stars) {
             s.x = (rand() % 4000) - 2000.0f;
             s.y = (rand() % 4000) - 2000.0f;
             s.z = (rand() % 2000) + 1.0f;
         }
     }
 
-    for (auto& s : data->stars) {
+    for (auto& s : state.stars) {
         s.z -= 8.0f;
         if (s.z <= 1.0f) {
             s.x = (rand() % 4000) - 2000.0f;
@@ -33,3 +41,13 @@ void RenderStars(HDC memDC, ScreenData* data, int width, int height, const RECT&
         }
     }
 }
+
+REGISTER_SCREENSAVER(
+    6,
+    L"3D Starfield",
+    "stars",
+    { "stars", "starfield", "3dstars" },
+    WRAP_LEGACY(RenderStars),
+    {}
+);
+

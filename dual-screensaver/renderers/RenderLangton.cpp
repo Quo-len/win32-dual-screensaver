@@ -1,79 +1,81 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/AntSettings.h"
 #include <vector>
+#include <cstdlib> // For rand()
+
+struct AntState {
+    int x, y;
+    int dir;
+    unsigned int color; // Track individual color for each ant
+};
+
+struct LangtonState {
+    int antCols = 0;
+    int antRows = 0;
+    std::vector<AntState> ants;
+    std::vector<unsigned char> antGrid;
+};
 
 void RenderLangton(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<LangtonState>(16);
+
     int cellSize = 2;
     int cols = width / cellSize;
     int rows = height / cellSize;
 
     if (cols <= 0 || rows <= 0) return;
 
-    if (data->antCols != cols || data->antRows != rows) {
-        data->antCols = cols;
-        data->antRows = rows;
-        data->antGrid.assign(cols * rows, 0);
+    // Initialization block
+    if (state.antCols != cols || state.antRows != rows) {
+        state.antCols = cols;
+        state.antRows = rows;
+        state.antGrid.assign(cols * rows, 0);
         data->pixels.assign(cols * rows, 0xFF000000); // Black Background
-        data->ants.clear();
+        state.ants.clear();
 
-        unsigned char r = (rand() % 156) + 100;
-        unsigned char g = (rand() % 156) + 100;
-        unsigned char b = (rand() % 156) + 100;
-
-        data->currentAntColor = 0xFF000000 | (r << 16) | (g << 8) | b;
-
-        int symType = rand() % 3;
         for (int i = 0; i < g_AntCount; i++) {
-            int cx = cols / 2;
-            int cy = rows / 2;
-            int rx = rand() % (cx / 4);
-            int ry = rand() % (cy / 4);
+            // Random placement anywhere on the screen
+            int rx = rand() % cols;
+            int ry = rand() % rows;
             int rdir = rand() % 4;
 
-            if (symType == 0) {
-                data->ants.push_back({ cx + rx, cy + ry, rdir });
-                data->ants.push_back({ cx - rx, cy - ry, (rdir + 2) % 4 });
-            }
-            else if (symType == 1) {
-                data->ants.push_back({ cx + rx, cy + ry, rdir });
-                int dirX = (rdir == 1) ? 3 : ((rdir == 3) ? 1 : rdir);
-                data->ants.push_back({ cx - rx, cy + ry, dirX });
-                int dirY = (rdir == 0) ? 2 : ((rdir == 2) ? 0 : rdir);
-                data->ants.push_back({ cx + rx, cy - ry, dirY });
-                int dirXY = (dirX == 0) ? 2 : ((dirX == 2) ? 0 : dirX);
-                data->ants.push_back({ cx - rx, cy - ry, dirXY });
-            }
-            else {
-                data->ants.push_back({ cx + rx, cy + ry, rdir });
-                data->ants.push_back({ cx + ry, cy - rx, (rdir + 1) % 4 });
-                data->ants.push_back({ cx - rx, cy - ry, (rdir + 2) % 4 });
-                data->ants.push_back({ cx - ry, cy + rx, (rdir + 3) % 4 });
-            }
+            // Generate a random bright color for this specific ant
+            unsigned char r = (rand() % 156) + 100;
+            unsigned char g = (rand() % 156) + 100;
+            unsigned char b = (rand() % 156) + 100;
+            unsigned int antColor = 0xFF000000 | (r << 16) | (g << 8) | b;
+
+            state.ants.push_back({ rx, ry, rdir, antColor });
         }
     }
 
+    // Update block
     for (int step = 0; step < g_AntSpeed; step++) {
-        for (auto& ant : data->ants) {
+        for (auto& ant : state.ants) {
+            // Wrap around screen edges
             if (ant.x < 0) ant.x += cols;
             if (ant.x >= cols) ant.x -= cols;
             if (ant.y < 0) ant.y += rows;
             if (ant.y >= rows) ant.y -= rows;
 
             int idx = ant.y * cols + ant.x;
-            unsigned char state = data->antGrid[idx];
+            unsigned char cellState = state.antGrid[idx];
 
-            if (state == 0) {
+            if (cellState == 0) {
                 ant.dir = (ant.dir + 1) % 4;
-                data->antGrid[idx] = 1;
-                data->pixels[idx] = data->currentAntColor;
+                state.antGrid[idx] = 1;
+                data->pixels[idx] = ant.color; // Drop this specific ant's color
             }
             else {
                 ant.dir = (ant.dir + 3) % 4;
-                data->antGrid[idx] = 0;
+                state.antGrid[idx] = 0;
                 data->pixels[idx] = 0xFF000000;
             }
 
+            // Move forward
             if (ant.dir == 0) ant.y--;
             else if (ant.dir == 1) ant.x++;
             else if (ant.dir == 2) ant.y++;
@@ -92,3 +94,12 @@ void RenderLangton(HDC memDC, ScreenData* data, int width, int height, const REC
     StretchDIBits(memDC, 0, 0, cols * cellSize, rows * cellSize,
         0, 0, cols, rows, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(
+    16,
+    L"Langton's Ant",
+    "ant",
+    { "ant", "langton" },
+    WRAP_LEGACY(RenderLangton),
+    GetAntSettings()
+);

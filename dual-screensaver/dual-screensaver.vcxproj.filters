@@ -57,9 +57,6 @@
     <ClInclude Include="Settings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ScreensaverRegistry.h">
       <Filter>Header Files</Filter>
     </ClInclude>

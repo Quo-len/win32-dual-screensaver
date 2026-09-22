@@ -1,25 +1,38 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
 
-void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    static int lastHeight = -1;
+struct MemoryDumpState {
+    uint64_t baseAddress = 0x00007FF000000000;
+    int scrollDelay = 0;
+    HFONT hFont = nullptr;
+    int lastWidth = 0;
+    int lastHeight = 0;
 
-    if (data->hexLastWidth != width || lastHeight != height || data->hHexFont == NULL) {
-        if (data->hHexFont) DeleteObject(data->hHexFont);
+    ~MemoryDumpState() {
+        if (hFont) DeleteObject(hFont);
+    }
+};
+
+void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<MemoryDumpState>(14);
+
+    if (state.lastWidth != width || state.lastHeight != height || state.hFont == NULL) {
+        if (state.hFont) DeleteObject(state.hFont);
 
         int fontHeight = (width / 78) * 2;
         if (fontHeight < 8) fontHeight = 8;
 
-        data->hHexFont = CreateFontA(fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        state.hFont = CreateFontA(fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             FIXED_PITCH | FF_MODERN, "Consolas");
 
-        data->hexLastWidth = width;
-        lastHeight = height;
+        state.lastWidth = width;
+        state.lastHeight = height;
     }
 
-    SelectObject(memDC, data->hHexFont);
+    SelectObject(memDC, state.hFont);
     SetBkMode(memDC, TRANSPARENT);
 
     TEXTMETRIC tm;
@@ -33,13 +46,13 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
     int startX = (width - (78 * cWidth)) / 2;
     if (startX < 0) startX = 0;
 
-    if (++data->hexDumpScrollDelay > 1) {
-        data->hexBaseAddress += 16;
-        data->hexDumpScrollDelay = 0;
+    if (++state.scrollDelay > 1) {
+        state.baseAddress += 16;
+        state.scrollDelay = 0;
     }
 
-    uint32_t seed = (uint32_t)(data->hexBaseAddress ^ (data->hexBaseAddress >> 32));
-    uint64_t currentAddr = data->hexBaseAddress;
+    uint32_t seed = (uint32_t)(state.baseAddress ^ (state.baseAddress >> 32));
+    uint64_t currentAddr = state.baseAddress;
 
     for (int i = 0; i < lines; i++) {
         char addrPart[16];
@@ -85,3 +98,12 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
         currentAddr += 16;
     }
 }
+
+REGISTER_SCREENSAVER(
+    14,
+    L"Hex Memory Dump",
+    "memory",
+    { "memory", "hex", "dump" },
+    WRAP_LEGACY(RenderMemoryDump),
+    {}
+);

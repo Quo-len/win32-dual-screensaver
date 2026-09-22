@@ -1,8 +1,21 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/PongSettings.h"
+
+struct PongState {
+    float ballX = -1.0f;
+    float ballY = -1.0f;
+    float ballDX = 0.0f;
+    float ballDY = 0.0f;
+    float padLeftY = 0.0f;
+    float padRightY = 0.0f;
+};
 
 void RenderPong(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<PongState>(9);
+
     int padWidth = max(5, width / 70);
     int padHeight = max(20, height / 6);
     int ballSize = padWidth;
@@ -10,44 +23,44 @@ void RenderPong(HDC memDC, ScreenData* data, int width, int height, const RECT& 
     float speedX = g_PongSpeed;
     float speedY = g_PongSpeed;
 
-    if (data->pBallX < 0.0f) {
-        data->pBallX = (float)(width / 2);
-        data->pBallY = (float)(height / 2);
-        data->pBallDX = speedX;
-        data->pBallDY = speedY;
-        data->pPadLeftY = (float)(height / 2 - padHeight / 2);
-        data->pPadRightY = (float)(height / 2 - padHeight / 2);
+    if (state.ballX < 0.0f) {
+        state.ballX = (float)(width / 2);
+        state.ballY = (float)(height / 2);
+        state.ballDX = speedX;
+        state.ballDY = speedY;
+        state.padLeftY = (float)(height / 2 - padHeight / 2);
+        state.padRightY = (float)(height / 2 - padHeight / 2);
     }
 
-    data->pBallDX = (data->pBallDX > 0) ? speedX : -speedX;
-    data->pBallDY = (data->pBallDY > 0) ? speedY : -speedY;
+    state.ballDX = (state.ballDX > 0) ? speedX : -speedX;
+    state.ballDY = (state.ballDY > 0) ? speedY : -speedY;
 
-    data->pBallX += data->pBallDX;
-    data->pBallY += data->pBallDY;
+    state.ballX += state.ballDX;
+    state.ballY += state.ballDY;
 
-    if (data->pBallY <= 0.0f) { data->pBallY = 0.0f; data->pBallDY *= -1.0f; }
-    else if (data->pBallY + ballSize >= height) { data->pBallY = (float)(height - ballSize); data->pBallDY *= -1.0f; }
+    if (state.ballY <= 0.0f) { state.ballY = 0.0f; state.ballDY *= -1.0f; }
+    else if (state.ballY + ballSize >= height) { state.ballY = (float)(height - ballSize); state.ballDY *= -1.0f; }
 
-    if (data->pBallX <= padWidth) { data->pBallX = (float)padWidth; data->pBallDX *= -1.0f; }
-    else if (data->pBallX + ballSize >= width - padWidth) { data->pBallX = (float)(width - padWidth - ballSize); data->pBallDX *= -1.0f; }
+    if (state.ballX <= padWidth) { state.ballX = (float)padWidth; state.ballDX *= -1.0f; }
+    else if (state.ballX + ballSize >= width - padWidth) { state.ballX = (float)(width - padWidth - ballSize); state.ballDX *= -1.0f; }
 
-    data->pPadLeftY = data->pBallY + (ballSize / 2.0f) - (padHeight / 2.0f);
-    data->pPadRightY = data->pBallY + (ballSize / 2.0f) - (padHeight / 2.0f);
+    state.padLeftY = state.ballY + (ballSize / 2.0f) - (padHeight / 2.0f);
+    state.padRightY = state.ballY + (ballSize / 2.0f) - (padHeight / 2.0f);
 
-    if (data->pPadLeftY < 0.0f) data->pPadLeftY = 0.0f;
-    if (data->pPadLeftY > height - padHeight) data->pPadLeftY = (float)(height - padHeight);
-    if (data->pPadRightY < 0.0f) data->pPadRightY = 0.0f;
-    if (data->pPadRightY > height - padHeight) data->pPadRightY = (float)(height - padHeight);
+    if (state.padLeftY < 0.0f) state.padLeftY = 0.0f;
+    if (state.padLeftY > height - padHeight) state.padLeftY = (float)(height - padHeight);
+    if (state.padRightY < 0.0f) state.padRightY = 0.0f;
+    if (state.padRightY > height - padHeight) state.padRightY = (float)(height - padHeight);
 
     HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
 
-    RECT rectLeft = { 0, (int)data->pPadLeftY, padWidth, (int)data->pPadLeftY + padHeight };
+    RECT rectLeft = { 0, (int)state.padLeftY, padWidth, (int)state.padLeftY + padHeight };
     FillRect(memDC, &rectLeft, hBrush);
 
-    RECT rectRight = { width - padWidth, (int)data->pPadRightY, width, (int)data->pPadRightY + padHeight };
+    RECT rectRight = { width - padWidth, (int)state.padRightY, width, (int)state.padRightY + padHeight };
     FillRect(memDC, &rectRight, hBrush);
 
-    RECT rectBall = { (int)data->pBallX, (int)data->pBallY, (int)data->pBallX + ballSize, (int)data->pBallY + ballSize };
+    RECT rectBall = { (int)state.ballX, (int)state.ballY, (int)state.ballX + ballSize, (int)state.ballY + ballSize };
     FillRect(memDC, &rectBall, hBrush);
 
     for (int i = 0; i < height; i += padHeight) {
@@ -57,3 +70,13 @@ void RenderPong(HDC memDC, ScreenData* data, int width, int height, const RECT& 
 
     DeleteObject(hBrush);
 }
+
+REGISTER_SCREENSAVER(
+    9,
+    L"Pong",
+    "pong",
+    { "pong" },
+    WRAP_LEGACY(RenderPong),
+    GetPongSettings()
+);
+

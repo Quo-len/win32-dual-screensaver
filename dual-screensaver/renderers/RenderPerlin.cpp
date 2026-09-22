@@ -1,11 +1,32 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/PerlinSettings.h"
 #include "../utils/Perlin.h"
 #include <math.h>
 
+struct FlowParticle {
+    float x, y;
+    float prev_x, prev_y;
+    int life;
+};
+
+struct PerlinState {
+    std::vector<FlowParticle> flowParticles;
+    float flowZOff = 0.0f;
+    int perm[512] = { 0 };
+    bool initialized = false;
+};
+
 void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
+
+    auto& state = data->GetCustomState<PerlinState>(12);
+    if (!state.initialized) {
+        initPerlin((unsigned int)GetTickCount64(), state.perm);
+        state.initialized = true;
+    }
 
     if (data->cols != width || data->rows != height || data->pixels.empty()) {
         data->cols = width;
@@ -15,8 +36,8 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
         int numParticles = (width * height) / 500;
         if (numParticles > 8000) numParticles = 8000;
 
-        data->flowParticles.resize(numParticles);
-        for (auto& p : data->flowParticles) {
+        state.flowParticles.resize(numParticles);
+        for (auto& p : state.flowParticles) {
             p.x = (float)(rand() % width);
             p.y = (float)(rand() % height);
             p.prev_x = p.x;
@@ -43,19 +64,19 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
         px[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
-    data->flowZOff += 0.003f;
+    state.flowZOff += 0.003f;
     const float PI = 3.14159265358979323846f;
     const int speedMultiplier = g_PerlinSpeed;
 
-    int particleCount = (int)data->flowParticles.size();
+    int particleCount = (int)state.flowParticles.size();
 
     int steps = (int)ceil(g_PerlinSpeed);
     float stepFraction = g_PerlinSpeed / (float)steps;
 
     for (int i = 0; i < particleCount; i++) {
-        auto& p = data->flowParticles[i];
+        auto& p = state.flowParticles[i];
 
-        float noiseVal = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, data->flowZOff, data->perm);
+        float noiseVal = perlin(p.x * g_PerlinScale, p.y * g_PerlinScale, state.flowZOff, state.perm);
         float angle = noiseVal * PI * 4.0f;
 
         float vx = cos(angle);
@@ -106,3 +127,12 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     StretchDIBits(memDC, 0, 0, width, height,
         0, 0, width, height, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(
+    12,
+    L"Perlin Flow Field",
+    "perlin",
+    { "perlin", "flow" },
+    WRAP_LEGACY(RenderPerlin),
+    GetPerlinSettings()
+);

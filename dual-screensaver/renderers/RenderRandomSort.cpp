@@ -1,278 +1,301 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
 
 // add to settings ability to enter number of items and sorting speed, and maybe even specific algorithm to use (or exclude certain ones
+struct SortState {
+    std::vector<int> sortArray;
+    int sortState = 0;
+    int sortAlgo = 0;
+    int sortI = 0, sortJ = 0, sortMin = 0;
+    bool sortFlag = false;
+    int sortSweepIdx = 0;
+    int sortWait = 0;
+    int sortRed1 = -1, sortRed2 = -1;
+    char sortAlgoName[32] = { 0 };
+    int sortSubState = 0;
+    std::vector<int> sortStack;
+    std::vector<int> sortOutput;
+    int sortGap = 0;
+    int sortCurrSize = 1;
+    int sortLeftStart = 0;
+    int sortExp = 1;
+    long long sortComparisons = 0;
+    long long sortSwaps = 0;
+};
+
 void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<SortState>(15);
     int numItems = 100;
 
-    if (data->sortArray.empty() || data->sortState == 0) {
-        data->sortArray.clear();
-        for (int i = 1; i <= numItems; i++) data->sortArray.push_back(i);
+    if (state.sortArray.empty() || state.sortState == 0) {
+        state.sortArray.clear();
+        for (int i = 1; i <= numItems; i++) state.sortArray.push_back(i);
         for (int i = numItems - 1; i > 0; i--) {
             int j = rand() % (i + 1);
-            std::swap(data->sortArray[i], data->sortArray[j]);
+            std::swap(state.sortArray[i], state.sortArray[j]);
         }
-        data->sortState = 1;
-        data->sortAlgo = rand() % 9;
-        data->sortI = 0; data->sortJ = 0; data->sortMin = 0; data->sortFlag = false;
-        data->sortRed1 = -1; data->sortRed2 = -1;
-        data->sortSubState = 0; data->sortStack.clear(); data->sortOutput.clear();
-        data->sortComparisons = 0; data->sortSwaps = 0;
+        state.sortState = 1;
+        state.sortAlgo = rand() % 9;
+        state.sortI = 0; state.sortJ = 0; state.sortMin = 0; state.sortFlag = false;
+        state.sortRed1 = -1; state.sortRed2 = -1;
+        state.sortSubState = 0; state.sortStack.clear(); state.sortOutput.clear();
+        state.sortComparisons = 0; state.sortSwaps = 0;
 
-        if (data->sortAlgo == 0) strcpy_s(data->sortAlgoName, "Bubble Sort");
-        else if (data->sortAlgo == 1) { strcpy_s(data->sortAlgoName, "Selection Sort"); data->sortJ = 1; }
-        else if (data->sortAlgo == 2) { strcpy_s(data->sortAlgoName, "Insertion Sort"); data->sortI = 1; data->sortJ = 1; }
-        else if (data->sortAlgo == 3) { strcpy_s(data->sortAlgoName, "Odd-Even Sort"); }
-        else if (data->sortAlgo == 4) { strcpy_s(data->sortAlgoName, "Shell Sort"); data->sortGap = numItems / 2; data->sortI = data->sortGap; data->sortJ = data->sortGap; }
-        else if (data->sortAlgo == 5) { strcpy_s(data->sortAlgoName, "Quick Sort"); data->sortStack.push_back(0); data->sortStack.push_back(numItems - 1); }
-        else if (data->sortAlgo == 6) { strcpy_s(data->sortAlgoName, "Merge Sort (In-Place)"); data->sortCurrSize = 1; data->sortLeftStart = 0; }
-        else if (data->sortAlgo == 7) { strcpy_s(data->sortAlgoName, "Heap Sort"); data->sortI = numItems / 2 - 1; }
-        else if (data->sortAlgo == 8) { strcpy_s(data->sortAlgoName, "Radix Sort (LSD)"); data->sortExp = 1; data->sortMin = numItems; }
+        if (state.sortAlgo == 0) strcpy_s(state.sortAlgoName, "Bubble Sort");
+        else if (state.sortAlgo == 1) { strcpy_s(state.sortAlgoName, "Selection Sort"); state.sortJ = 1; }
+        else if (state.sortAlgo == 2) { strcpy_s(state.sortAlgoName, "Insertion Sort"); state.sortI = 1; state.sortJ = 1; }
+        else if (state.sortAlgo == 3) { strcpy_s(state.sortAlgoName, "Odd-Even Sort"); }
+        else if (state.sortAlgo == 4) { strcpy_s(state.sortAlgoName, "Shell Sort"); state.sortGap = numItems / 2; state.sortI = state.sortGap; state.sortJ = state.sortGap; }
+        else if (state.sortAlgo == 5) { strcpy_s(state.sortAlgoName, "Quick Sort"); state.sortStack.push_back(0); state.sortStack.push_back(numItems - 1); }
+        else if (state.sortAlgo == 6) { strcpy_s(state.sortAlgoName, "Merge Sort (In-Place)"); state.sortCurrSize = 1; state.sortLeftStart = 0; }
+        else if (state.sortAlgo == 7) { strcpy_s(state.sortAlgoName, "Heap Sort"); state.sortI = numItems / 2 - 1; }
+        else if (state.sortAlgo == 8) { strcpy_s(state.sortAlgoName, "Radix Sort (LSD)"); state.sortExp = 1; state.sortMin = numItems; }
     }
 
-    int stepsPerFrame = (data->sortAlgo == 2 || data->sortAlgo == 6) ? 1 : 4;
+    int stepsPerFrame = (state.sortAlgo == 2 || state.sortAlgo == 6) ? 1 : 4;
 
-    if (data->sortState == 1) {
-        for (int step = 0; step < stepsPerFrame && data->sortState == 1; step++) {
-            data->sortRed1 = -1; data->sortRed2 = -1;
+    if (state.sortState == 1) {
+        for (int step = 0; step < stepsPerFrame && state.sortState == 1; step++) {
+            state.sortRed1 = -1; state.sortRed2 = -1;
 
-            if (data->sortAlgo == 0) {
-                if (data->sortI < numItems - 1) {
-                    if (data->sortJ < numItems - data->sortI - 1) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = data->sortJ + 1;
-                        data->sortComparisons++;
-                        if (data->sortArray[data->sortJ] > data->sortArray[data->sortJ + 1]) {
-                            std::swap(data->sortArray[data->sortJ], data->sortArray[data->sortJ + 1]);
-                            data->sortSwaps++;
+            if (state.sortAlgo == 0) {
+                if (state.sortI < numItems - 1) {
+                    if (state.sortJ < numItems - state.sortI - 1) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = state.sortJ + 1;
+                        state.sortComparisons++;
+                        if (state.sortArray[state.sortJ] > state.sortArray[state.sortJ + 1]) {
+                            std::swap(state.sortArray[state.sortJ], state.sortArray[state.sortJ + 1]);
+                            state.sortSwaps++;
                         }
-                        data->sortJ++;
+                        state.sortJ++;
                     }
-                    else { data->sortJ = 0; data->sortI++; }
+                    else { state.sortJ = 0; state.sortI++; }
                 }
-                else { data->sortState = 2; data->sortSweepIdx = 0; }
+                else { state.sortState = 2; state.sortSweepIdx = 0; }
             }
-            else if (data->sortAlgo == 1) {
-                if (data->sortI < numItems - 1) {
-                    if (data->sortJ < numItems) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = data->sortMin;
-                        data->sortComparisons++;
-                        if (data->sortArray[data->sortJ] < data->sortArray[data->sortMin]) data->sortMin = data->sortJ;
-                        data->sortJ++;
+            else if (state.sortAlgo == 1) {
+                if (state.sortI < numItems - 1) {
+                    if (state.sortJ < numItems) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = state.sortMin;
+                        state.sortComparisons++;
+                        if (state.sortArray[state.sortJ] < state.sortArray[state.sortMin]) state.sortMin = state.sortJ;
+                        state.sortJ++;
                     }
                     else {
-                        std::swap(data->sortArray[data->sortI], data->sortArray[data->sortMin]);
-                        data->sortSwaps++;
-                        data->sortI++; data->sortMin = data->sortI; data->sortJ = data->sortI + 1;
+                        std::swap(state.sortArray[state.sortI], state.sortArray[state.sortMin]);
+                        state.sortSwaps++;
+                        state.sortI++; state.sortMin = state.sortI; state.sortJ = state.sortI + 1;
                     }
                 }
-                else { data->sortState = 2; data->sortSweepIdx = 0; }
+                else { state.sortState = 2; state.sortSweepIdx = 0; }
             }
-            else if (data->sortAlgo == 2) {
-                if (data->sortI < numItems) {
-                    data->sortComparisons++;
-                    if (data->sortJ > 0 && data->sortArray[data->sortJ - 1] > data->sortArray[data->sortJ]) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = data->sortJ - 1;
-                        std::swap(data->sortArray[data->sortJ], data->sortArray[data->sortJ - 1]);
-                        data->sortSwaps++;
-                        data->sortJ--;
+            else if (state.sortAlgo == 2) {
+                if (state.sortI < numItems) {
+                    state.sortComparisons++;
+                    if (state.sortJ > 0 && state.sortArray[state.sortJ - 1] > state.sortArray[state.sortJ]) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = state.sortJ - 1;
+                        std::swap(state.sortArray[state.sortJ], state.sortArray[state.sortJ - 1]);
+                        state.sortSwaps++;
+                        state.sortJ--;
                     }
-                    else { data->sortI++; data->sortJ = data->sortI; }
+                    else { state.sortI++; state.sortJ = state.sortI; }
                 }
-                else { data->sortState = 2; data->sortSweepIdx = 0; }
+                else { state.sortState = 2; state.sortSweepIdx = 0; }
             }
-            else if (data->sortAlgo == 3) {
-                if (data->sortI == 0 || data->sortI == 1) {
-                    if (data->sortJ < numItems - 1) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = data->sortJ + 1;
-                        data->sortComparisons++;
-                        if (data->sortArray[data->sortJ] > data->sortArray[data->sortJ + 1]) {
-                            std::swap(data->sortArray[data->sortJ], data->sortArray[data->sortJ + 1]);
-                            data->sortSwaps++;
-                            data->sortFlag = true;
+            else if (state.sortAlgo == 3) {
+                if (state.sortI == 0 || state.sortI == 1) {
+                    if (state.sortJ < numItems - 1) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = state.sortJ + 1;
+                        state.sortComparisons++;
+                        if (state.sortArray[state.sortJ] > state.sortArray[state.sortJ + 1]) {
+                            std::swap(state.sortArray[state.sortJ], state.sortArray[state.sortJ + 1]);
+                            state.sortSwaps++;
+                            state.sortFlag = true;
                         }
-                        data->sortJ += 2;
+                        state.sortJ += 2;
                     }
                     else {
-                        if (data->sortI == 0) { data->sortI = 1; data->sortJ = 1; }
+                        if (state.sortI == 0) { state.sortI = 1; state.sortJ = 1; }
                         else {
-                            if (!data->sortFlag) { data->sortState = 2; data->sortSweepIdx = 0; }
-                            else { data->sortI = 0; data->sortJ = 0; data->sortFlag = false; }
+                            if (!state.sortFlag) { state.sortState = 2; state.sortSweepIdx = 0; }
+                            else { state.sortI = 0; state.sortJ = 0; state.sortFlag = false; }
                         }
                     }
                 }
             }
-            else if (data->sortAlgo == 4) {
-                if (data->sortGap == 0) { data->sortState = 2; data->sortSweepIdx = 0; break; }
-                if (data->sortI < numItems) {
-                    data->sortComparisons++;
-                    if (data->sortJ >= data->sortGap && data->sortArray[data->sortJ - data->sortGap] > data->sortArray[data->sortJ]) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = data->sortJ - data->sortGap;
-                        std::swap(data->sortArray[data->sortJ], data->sortArray[data->sortJ - data->sortGap]);
-                        data->sortSwaps++;
-                        data->sortJ -= data->sortGap;
+            else if (state.sortAlgo == 4) {
+                if (state.sortGap == 0) { state.sortState = 2; state.sortSweepIdx = 0; break; }
+                if (state.sortI < numItems) {
+                    state.sortComparisons++;
+                    if (state.sortJ >= state.sortGap && state.sortArray[state.sortJ - state.sortGap] > state.sortArray[state.sortJ]) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = state.sortJ - state.sortGap;
+                        std::swap(state.sortArray[state.sortJ], state.sortArray[state.sortJ - state.sortGap]);
+                        state.sortSwaps++;
+                        state.sortJ -= state.sortGap;
                     }
-                    else { data->sortI++; data->sortJ = data->sortI; }
+                    else { state.sortI++; state.sortJ = state.sortI; }
                 }
                 else {
-                    data->sortGap /= 2; data->sortI = data->sortGap; data->sortJ = data->sortGap;
+                    state.sortGap /= 2; state.sortI = state.sortGap; state.sortJ = state.sortGap;
                 }
             }
-            else if (data->sortAlgo == 5) {
-                if (data->sortSubState == 0) {
-                    if (data->sortStack.empty()) { data->sortState = 2; data->sortSweepIdx = 0; break; }
-                    int h = data->sortStack.back(); data->sortStack.pop_back();
-                    int l = data->sortStack.back(); data->sortStack.pop_back();
-                    data->sortMin = data->sortArray[h];
-                    data->sortI = l - 1; data->sortJ = l;
-                    data->sortStack.push_back(l); data->sortStack.push_back(h);
-                    data->sortSubState = 1;
+            else if (state.sortAlgo == 5) {
+                if (state.sortSubState == 0) {
+                    if (state.sortStack.empty()) { state.sortState = 2; state.sortSweepIdx = 0; break; }
+                    int h = state.sortStack.back(); state.sortStack.pop_back();
+                    int l = state.sortStack.back(); state.sortStack.pop_back();
+                    state.sortMin = state.sortArray[h];
+                    state.sortI = l - 1; state.sortJ = l;
+                    state.sortStack.push_back(l); state.sortStack.push_back(h);
+                    state.sortSubState = 1;
                 }
-                else if (data->sortSubState == 1) {
-                    int h = data->sortStack.back();
-                    if (data->sortJ < h) {
-                        data->sortRed1 = data->sortJ; data->sortRed2 = h;
-                        data->sortComparisons++;
-                        if (data->sortArray[data->sortJ] < data->sortMin) {
-                            data->sortI++;
-                            std::swap(data->sortArray[data->sortI], data->sortArray[data->sortJ]);
-                            data->sortSwaps++;
-                            data->sortRed1 = data->sortI;
+                else if (state.sortSubState == 1) {
+                    int h = state.sortStack.back();
+                    if (state.sortJ < h) {
+                        state.sortRed1 = state.sortJ; state.sortRed2 = h;
+                        state.sortComparisons++;
+                        if (state.sortArray[state.sortJ] < state.sortMin) {
+                            state.sortI++;
+                            std::swap(state.sortArray[state.sortI], state.sortArray[state.sortJ]);
+                            state.sortSwaps++;
+                            state.sortRed1 = state.sortI;
                         }
-                        data->sortJ++;
+                        state.sortJ++;
                     }
-                    else { data->sortSubState = 2; }
+                    else { state.sortSubState = 2; }
                 }
-                else if (data->sortSubState == 2) {
-                    int h = data->sortStack.back(); data->sortStack.pop_back();
-                    int l = data->sortStack.back(); data->sortStack.pop_back();
-                    data->sortI++;
-                    std::swap(data->sortArray[data->sortI], data->sortArray[h]);
-                    data->sortSwaps++;
-                    data->sortRed1 = data->sortI; data->sortRed2 = h;
-                    int p = data->sortI;
-                    if (p - 1 > l) { data->sortStack.push_back(l); data->sortStack.push_back(p - 1); }
-                    if (p + 1 < h) { data->sortStack.push_back(p + 1); data->sortStack.push_back(h); }
-                    data->sortSubState = 0;
+                else if (state.sortSubState == 2) {
+                    int h = state.sortStack.back(); state.sortStack.pop_back();
+                    int l = state.sortStack.back(); state.sortStack.pop_back();
+                    state.sortI++;
+                    std::swap(state.sortArray[state.sortI], state.sortArray[h]);
+                    state.sortSwaps++;
+                    state.sortRed1 = state.sortI; state.sortRed2 = h;
+                    int p = state.sortI;
+                    if (p - 1 > l) { state.sortStack.push_back(l); state.sortStack.push_back(p - 1); }
+                    if (p + 1 < h) { state.sortStack.push_back(p + 1); state.sortStack.push_back(h); }
+                    state.sortSubState = 0;
                 }
             }
-            else if (data->sortAlgo == 6) {
-                if (data->sortCurrSize >= numItems) { data->sortState = 2; data->sortSweepIdx = 0; break; }
-                if (data->sortSubState == 0) {
-                    if (data->sortLeftStart < numItems - 1) {
-                        int mid = data->sortLeftStart + data->sortCurrSize - 1;
+            else if (state.sortAlgo == 6) {
+                if (state.sortCurrSize >= numItems) { state.sortState = 2; state.sortSweepIdx = 0; break; }
+                if (state.sortSubState == 0) {
+                    if (state.sortLeftStart < numItems - 1) {
+                        int mid = state.sortLeftStart + state.sortCurrSize - 1;
                         if (mid >= numItems - 1) mid = numItems - 1;
-                        data->sortI = data->sortLeftStart; data->sortJ = mid + 1; data->sortMin = mid;
-                        data->sortSubState = 1;
+                        state.sortI = state.sortLeftStart; state.sortJ = mid + 1; state.sortMin = mid;
+                        state.sortSubState = 1;
                     }
                     else {
-                        data->sortCurrSize *= 2; data->sortLeftStart = 0;
+                        state.sortCurrSize *= 2; state.sortLeftStart = 0;
                     }
                 }
-                else if (data->sortSubState == 1) {
-                    int rightEnd = data->sortLeftStart + 2 * data->sortCurrSize - 1;
+                else if (state.sortSubState == 1) {
+                    int rightEnd = state.sortLeftStart + 2 * state.sortCurrSize - 1;
                     if (rightEnd >= numItems - 1) rightEnd = numItems - 1;
-                    if (data->sortI <= data->sortMin && data->sortJ <= rightEnd) {
-                        data->sortRed1 = data->sortI; data->sortRed2 = data->sortJ;
-                        data->sortComparisons++;
-                        if (data->sortArray[data->sortI] <= data->sortArray[data->sortJ]) {
-                            data->sortI++;
+                    if (state.sortI <= state.sortMin && state.sortJ <= rightEnd) {
+                        state.sortRed1 = state.sortI; state.sortRed2 = state.sortJ;
+                        state.sortComparisons++;
+                        if (state.sortArray[state.sortI] <= state.sortArray[state.sortJ]) {
+                            state.sortI++;
                         }
                         else {
-                            int val = data->sortArray[data->sortJ];
-                            for (int k = data->sortJ; k > data->sortI; k--) {
-                                data->sortArray[k] = data->sortArray[k - 1];
-                                data->sortSwaps++;
+                            int val = state.sortArray[state.sortJ];
+                            for (int k = state.sortJ; k > state.sortI; k--) {
+                                state.sortArray[k] = state.sortArray[k - 1];
+                                state.sortSwaps++;
                             }
-                            data->sortArray[data->sortI] = val;
-                            data->sortSwaps++;
-                            data->sortI++; data->sortMin++; data->sortJ++;
+                            state.sortArray[state.sortI] = val;
+                            state.sortSwaps++;
+                            state.sortI++; state.sortMin++; state.sortJ++;
                         }
                     }
                     else {
-                        data->sortLeftStart += 2 * data->sortCurrSize;
-                        data->sortSubState = 0;
+                        state.sortLeftStart += 2 * state.sortCurrSize;
+                        state.sortSubState = 0;
                     }
                 }
             }
-            else if (data->sortAlgo == 7) {
-                if (data->sortSubState == 0) {
-                    if (data->sortI >= 0) { data->sortJ = data->sortI; data->sortSubState = 1; }
-                    else { data->sortI = numItems - 1; data->sortSubState = 2; }
+            else if (state.sortAlgo == 7) {
+                if (state.sortSubState == 0) {
+                    if (state.sortI >= 0) { state.sortJ = state.sortI; state.sortSubState = 1; }
+                    else { state.sortI = numItems - 1; state.sortSubState = 2; }
                 }
-                else if (data->sortSubState == 1 || data->sortSubState == 3) {
-                    int largest = data->sortJ, l = 2 * data->sortJ + 1, r = 2 * data->sortJ + 2;
-                    int limit = (data->sortSubState == 1) ? numItems : data->sortI;
+                else if (state.sortSubState == 1 || state.sortSubState == 3) {
+                    int largest = state.sortJ, l = 2 * state.sortJ + 1, r = 2 * state.sortJ + 2;
+                    int limit = (state.sortSubState == 1) ? numItems : state.sortI;
 
-                    data->sortComparisons++;
-                    if (l < limit && data->sortArray[l] > data->sortArray[largest]) largest = l;
-                    data->sortComparisons++;
-                    if (r < limit && data->sortArray[r] > data->sortArray[largest]) largest = r;
+                    state.sortComparisons++;
+                    if (l < limit && state.sortArray[l] > state.sortArray[largest]) largest = l;
+                    state.sortComparisons++;
+                    if (r < limit && state.sortArray[r] > state.sortArray[largest]) largest = r;
 
-                    data->sortRed1 = data->sortJ; data->sortRed2 = largest;
-                    if (largest != data->sortJ) {
-                        std::swap(data->sortArray[data->sortJ], data->sortArray[largest]);
-                        data->sortSwaps++;
-                        data->sortJ = largest;
+                    state.sortRed1 = state.sortJ; state.sortRed2 = largest;
+                    if (largest != state.sortJ) {
+                        std::swap(state.sortArray[state.sortJ], state.sortArray[largest]);
+                        state.sortSwaps++;
+                        state.sortJ = largest;
                     }
                     else {
-                        data->sortI--;
-                        data->sortSubState = (data->sortSubState == 1) ? 0 : 2;
+                        state.sortI--;
+                        state.sortSubState = (state.sortSubState == 1) ? 0 : 2;
                     }
                 }
-                else if (data->sortSubState == 2) {
-                    if (data->sortI > 0) {
-                        data->sortRed1 = 0; data->sortRed2 = data->sortI;
-                        std::swap(data->sortArray[0], data->sortArray[data->sortI]);
-                        data->sortSwaps++;
-                        data->sortJ = 0; data->sortSubState = 3;
+                else if (state.sortSubState == 2) {
+                    if (state.sortI > 0) {
+                        state.sortRed1 = 0; state.sortRed2 = state.sortI;
+                        std::swap(state.sortArray[0], state.sortArray[state.sortI]);
+                        state.sortSwaps++;
+                        state.sortJ = 0; state.sortSubState = 3;
                     }
-                    else { data->sortState = 2; data->sortSweepIdx = 0; }
+                    else { state.sortState = 2; state.sortSweepIdx = 0; }
                 }
             }
-            else if (data->sortAlgo == 8) {
-                if (data->sortMin / data->sortExp <= 0) { data->sortState = 2; data->sortSweepIdx = 0; break; }
-                if (data->sortSubState == 0) {
+            else if (state.sortAlgo == 8) {
+                if (state.sortMin / state.sortExp <= 0) { state.sortState = 2; state.sortSweepIdx = 0; break; }
+                if (state.sortSubState == 0) {
                     std::vector<int> count(10, 0);
-                    for (int i = 0; i < numItems; i++) count[(data->sortArray[i] / data->sortExp) % 10]++;
+                    for (int i = 0; i < numItems; i++) count[(state.sortArray[i] / state.sortExp) % 10]++;
                     for (int i = 1; i < 10; i++) count[i] += count[i - 1];
-                    data->sortStack = count;
-                    data->sortOutput.assign(numItems, 0);
-                    data->sortI = numItems - 1;
-                    data->sortSubState = 1;
+                    state.sortStack = count;
+                    state.sortOutput.assign(numItems, 0);
+                    state.sortI = numItems - 1;
+                    state.sortSubState = 1;
                 }
-                else if (data->sortSubState == 1) {
-                    if (data->sortI >= 0) {
-                        int idx = (data->sortArray[data->sortI] / data->sortExp) % 10;
-                        data->sortStack[idx]--;
-                        data->sortOutput[data->sortStack[idx]] = data->sortArray[data->sortI];
-                        data->sortSwaps++;
-                        data->sortRed1 = data->sortI; data->sortI--;
+                else if (state.sortSubState == 1) {
+                    if (state.sortI >= 0) {
+                        int idx = (state.sortArray[state.sortI] / state.sortExp) % 10;
+                        state.sortStack[idx]--;
+                        state.sortOutput[state.sortStack[idx]] = state.sortArray[state.sortI];
+                        state.sortSwaps++;
+                        state.sortRed1 = state.sortI; state.sortI--;
                     }
-                    else { data->sortI = 0; data->sortSubState = 2; }
+                    else { state.sortI = 0; state.sortSubState = 2; }
                 }
-                else if (data->sortSubState == 2) {
-                    if (data->sortI < numItems) {
-                        data->sortArray[data->sortI] = data->sortOutput[data->sortI];
-                        data->sortSwaps++;
-                        data->sortRed1 = data->sortI; data->sortI++;
+                else if (state.sortSubState == 2) {
+                    if (state.sortI < numItems) {
+                        state.sortArray[state.sortI] = state.sortOutput[state.sortI];
+                        state.sortSwaps++;
+                        state.sortRed1 = state.sortI; state.sortI++;
                     }
-                    else { data->sortExp *= 10; data->sortSubState = 0; }
+                    else { state.sortExp *= 10; state.sortSubState = 0; }
                 }
             }
         }
     }
-    else if (data->sortState == 2) {
-        data->sortRed1 = -1; data->sortRed2 = -1;
-        data->sortSweepIdx += 2;
-        if (data->sortSweepIdx >= numItems) {
-            data->sortState = 3;
-            data->sortWait = 0;
+    else if (state.sortState == 2) {
+        state.sortRed1 = -1; state.sortRed2 = -1;
+        state.sortSweepIdx += 2;
+        if (state.sortSweepIdx >= numItems) {
+            state.sortState = 3;
+            state.sortWait = 0;
         }
     }
-    else if (data->sortState == 3) {
-        data->sortWait++;
-        if (data->sortWait > 60) data->sortState = 0;
+    else if (state.sortState == 3) {
+        state.sortWait++;
+        if (state.sortWait > 60) state.sortState = 0;
     }
 
     int barWidth = width / numItems;
@@ -289,11 +312,11 @@ void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const 
 
     for (int i = 0; i < numItems; i++) {
         HBRUSH brush = defaultBrush;
-        if (data->sortState == 1 && (i == data->sortRed1 || i == data->sortRed2)) brush = redBrush;
-        else if (data->sortState == 2 && i <= data->sortSweepIdx) brush = greenBrush;
-        else if (data->sortState == 3) brush = greenBrush;
+        if (state.sortState == 1 && (i == state.sortRed1 || i == state.sortRed2)) brush = redBrush;
+        else if (state.sortState == 2 && i <= state.sortSweepIdx) brush = greenBrush;
+        else if (state.sortState == 3) brush = greenBrush;
 
-        int barH = (data->sortArray[i] * maxBarHeight) / numItems;
+        int barH = (state.sortArray[i] * maxBarHeight) / numItems;
 
         int left = (int)(i * barWidthDouble);
         int right = (int)((i + 1) * barWidthDouble);
@@ -316,12 +339,21 @@ void RenderRandomSort(HDC memDC, ScreenData* data, int width, int height, const 
 
     char txt[128];
     sprintf_s(txt, "Algorithm: %s | Status: %s | Swaps: %lld | Comparisons: %lld",
-        data->sortAlgoName,
-        (data->sortState >= 2) ? "SORTED!" : "Sorting...",
-        data->sortSwaps,
-        data->sortComparisons);
+        state.sortAlgoName,
+        (state.sortState >= 2) ? "SORTED!" : "Sorting...",
+        state.sortSwaps,
+        state.sortComparisons);
 
     TEXTMETRIC tm;
     GetTextMetrics(memDC, &tm);
     TextOutA(memDC, (width - (int)strlen(txt) * tm.tmAveCharWidth) / 2, 30, txt, (int)strlen(txt));
 }
+
+REGISTER_SCREENSAVER(
+    15,
+    L"Sorting Algorithms",
+    "sort",
+    { "sort", "sorting" },
+    WRAP_LEGACY(RenderRandomSort),
+    {}
+);

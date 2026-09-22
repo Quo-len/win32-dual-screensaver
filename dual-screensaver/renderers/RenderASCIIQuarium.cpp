@@ -1,5 +1,6 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <vector>
 #include <string>
 #include <cmath>
@@ -50,29 +51,91 @@ struct Cell {
     COLORREF color = 0;
 };
 
-static void InitAquarium(ScreenData* data, int cols, int rows) {
-    data->aquaWidthInChars = cols;
-    data->aquaHeightInChars = rows;
-    data->aquaFish.clear();
-    data->aquaBubbles.clear();
-    data->aquaSeaweed.clear();
-    data->aquaJelly.clear();
+struct AquaFish {
+    float x, y;
+    float vx;
+    int type;
+    COLORREF color;
+    int animFrame;
+};
+
+struct AquaBubble {
+    float x, y;
+    float speed;
+    float swaySpeed;
+    float swayPhase;
+    int type;
+};
+
+struct AquaSeaweed {
+    int x;
+    int height;
+    float phase;
+    COLORREF color;
+};
+
+struct AquaJellyfish {
+    float x, y;
+    float baseX;
+    float vy;
+    float pulsePhase;
+    COLORREF color;
+    int state;        // 0 = swimming up, 1 = descending
+    float topLimit;   // target row near surface before turning back down
+    float swayOffset;
+};
+
+struct AquaCrab {
+    float x;
+    int y;
+    float vx;
+    int animFrame;
+};
+
+struct AquaSurfaceEntity {
+    float x;
+    float vx;
+    bool active;
+    int type; // 0 = Duck, 1 = Sailing Ship, 2 = Whale
+    float animTimer;
+};
+
+struct AquaState {
+    bool initialized = false;
+    DWORD lastTick = 0;
+    int widthInChars = 0;
+    int heightInChars = 0;
+    std::vector<AquaFish> fish;
+    std::vector<AquaBubble> bubbles;
+    std::vector<AquaSeaweed> seaweed;
+    std::vector<AquaJellyfish> jelly;
+    AquaCrab crab = { 10.0f, 0, 0.4f, 0 };
+    AquaSurfaceEntity surface = { -15.0f, 0.25f, true, 0, 0.0f };
+};
+
+static void InitAquarium(AquaState& s, int cols, int rows) {
+    s.widthInChars = cols;
+    s.heightInChars = rows;
+    s.fish.clear();
+    s.bubbles.clear();
+    s.seaweed.clear();
+    s.jelly.clear();
 
     // Spawn Seaweed across the seabed
     int seaweedCount = (std::max)(6, cols / 10);
     for (int i = 0; i < seaweedCount; ++i) {
-        ScreenData::AquaSeaweed sw;
+        AquaSeaweed sw;
         sw.x = rand() % (cols - 4) + 2;
         sw.height = rand() % (std::max)(4, rows / 3) + (rows / 5);
         sw.phase = (float)(rand() % 628) / 100.0f;
         sw.color = (rand() % 2 == 0) ? RGB(40, 190, 80) : RGB(25, 150, 65);
-        data->aquaSeaweed.push_back(sw);
+        s.seaweed.push_back(sw);
     }
 
     // Spawn Fish
     int fishCount = (std::max)(12, cols / 7);
     for (int i = 0; i < fishCount; ++i) {
-        ScreenData::AquaFish f;
+        AquaFish f;
         f.x = (float)(rand() % cols);
         f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
         bool goRight = (rand() % 2 == 0);
@@ -81,13 +144,13 @@ static void InitAquarium(ScreenData* data, int cols, int rows) {
         f.type = rand() % 5; // Types 0 to 4
         f.color = FISH_COLORS[rand() % NUM_FISH_COLORS];
         f.animFrame = rand() % 10;
-        data->aquaFish.push_back(f);
+        s.fish.push_back(f);
     }
 
     // Spawn a couple of Jellyfish
     int jellyCount = (std::max)(2, cols / 40);
     for (int i = 0; i < jellyCount; ++i) {
-        ScreenData::AquaJellyfish j;
+        AquaJellyfish j;
         j.baseX = (float)(rand() % (cols - 14) + 3);
         j.x = j.baseX;
         if (i == 0) {
@@ -105,29 +168,31 @@ static void InitAquarium(ScreenData* data, int cols, int rows) {
         j.swayOffset = (float)(rand() % 628) / 100.0f;
         j.topLimit = (float)(rand() % (std::max)(1, rows / 4) + 8);
         j.color = JELLY_COLORS[rand() % NUM_JELLY_COLORS];
-        data->aquaJelly.push_back(j);
+        s.jelly.push_back(j);
     }
 
     // Crab on seabed
-    data->aquaCrab.x = (float)(cols / 2);
-    data->aquaCrab.y = rows - 3;
-    data->aquaCrab.vx = 0.25f;
-    data->aquaCrab.animFrame = 0;
+    s.crab.x = (float)(cols / 2);
+    s.crab.y = rows - 3;
+    s.crab.vx = 0.25f;
+    s.crab.animFrame = 0;
 
     // Surface vessel or creature (0=Duck, 1=1700s Ship, 2=Whale)
-    data->aquaSurface.type = rand() % 3;
+    s.surface.type = rand() % 3;
     bool goRight = (rand() % 2 == 0);
-    float baseSpd = (data->aquaSurface.type == 1) ? 0.18f : (data->aquaSurface.type == 2 ? 0.22f : 0.25f);
-    data->aquaSurface.vx = goRight ? baseSpd : -baseSpd;
-    data->aquaSurface.x = goRight ? -15.0f : (float)(cols + 5);
-    data->aquaSurface.active = true;
-    data->aquaSurface.animTimer = 0.0f;
+    float baseSpd = (s.surface.type == 1) ? 0.18f : (s.surface.type == 2 ? 0.22f : 0.25f);
+    s.surface.vx = goRight ? baseSpd : -baseSpd;
+    s.surface.x = goRight ? -15.0f : (float)(cols + 5);
+    s.surface.active = true;
+    s.surface.animTimer = 0.0f;
 
-    data->aquaLastTick = GetTickCount();
-    data->aquaInitialized = true;
+    s.lastTick = GetTickCount();
+    s.initialized = true;
 }
 
 void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& s = data->GetCustomState<AquaState>(24);
+
     SelectObject(memDC, data->hFont);
     SetBkMode(memDC, OPAQUE);
     SetBkColor(memDC, COL_WATER_BG);
@@ -144,14 +209,14 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     if (cols < 20) cols = 20;
     if (rows < 12) rows = 12;
 
-    if (!data->aquaInitialized || data->aquaWidthInChars != cols || data->aquaHeightInChars != rows) {
-        InitAquarium(data, cols, rows);
+    if (!s.initialized || s.widthInChars != cols || s.heightInChars != rows) {
+        InitAquarium(s, cols, rows);
     }
 
     DWORD now = GetTickCount();
-    float dt = (now - data->aquaLastTick) / 1000.0f;
+    float dt = (now - s.lastTick) / 1000.0f;
     if (dt <= 0.0f || dt > 0.1f) dt = 0.033f;
-    data->aquaLastTick = now;
+    s.lastTick = now;
     float timeVal = now * 0.003f;
 
     // Clear background
@@ -197,13 +262,13 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     }
 
     // Surface entity (Duck, 1700s Sailing Ship, or Surfacing Whale)
-    if (data->aquaSurface.active) {
-        data->aquaSurface.animTimer += dt;
-        data->aquaSurface.x += data->aquaSurface.vx * (dt * 30.0f);
-        int sx = (int)roundf(data->aquaSurface.x);
-        bool goingRight = (data->aquaSurface.vx > 0.0f);
+    if (s.surface.active) {
+        s.surface.animTimer += dt;
+        s.surface.x += s.surface.vx * (dt * 30.0f);
+        int sx = (int)roundf(s.surface.x);
+        bool goingRight = (s.surface.vx > 0.0f);
 
-        switch (data->aquaSurface.type) {
+        switch (s.surface.type) {
             case 0: { // 1. Rubber Duck (bottom row on water surface waveRow)
                 if (goingRight) {
                     // Clear background behind duck at waveRow
@@ -225,7 +290,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
                     }
 
                     putStr(sx + 2, waveRow - 2, "__", COL_DUCK);
-                    putChar(sx,     waveRow - 1, '<', COL_BEAK);
+                    putChar(sx,    waveRow - 1, '<', COL_BEAK);
                     putStr(sx + 1, waveRow - 1, "(o )___", COL_DUCK);
                     putStr(sx + 1, waveRow,     "( ._> /", COL_DUCK);
                 }
@@ -295,7 +360,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
             }
             case 2: { // 3. Surfacing Whale with Spout
                 // Animated water spout (7 frames from ASCIIquarium)
-                float spoutTimer = fmodf(data->aquaSurface.animTimer, 4.0f);
+                float spoutTimer = fmodf(s.surface.animTimer, 4.0f);
                 if (spoutTimer >= 0.8f && spoutTimer < 2.9f) {
                     int frame = (int)((spoutTimer - 0.8f) / 0.3f);
                     int bx = goingRight ? (sx + 14) : (sx + 4);
@@ -402,19 +467,19 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
             }
         }
 
-        if (goingRight && data->aquaSurface.x > cols + 35) {
-            data->aquaSurface.active = false;
-        } else if (!goingRight && data->aquaSurface.x < -35.0f) {
-            data->aquaSurface.active = false;
+        if (goingRight && s.surface.x > cols + 35) {
+            s.surface.active = false;
+        } else if (!goingRight && s.surface.x < -35.0f) {
+            s.surface.active = false;
         }
     } else if (rand() % 30 == 0) {
-        data->aquaSurface.active = true;
-        data->aquaSurface.type = (data->aquaSurface.type + 1 + (rand() % 2)) % 3;
+        s.surface.active = true;
+        s.surface.type = (s.surface.type + 1 + (rand() % 2)) % 3;
         bool goRight = (rand() % 2 == 0);
-        float baseSpd = (data->aquaSurface.type == 1) ? 0.18f : (data->aquaSurface.type == 2 ? 0.22f : 0.25f);
-        data->aquaSurface.vx = goRight ? baseSpd : -baseSpd;
-        data->aquaSurface.x = goRight ? -30.0f : (float)(cols + 30);
-        data->aquaSurface.animTimer = 0.0f;
+        float baseSpd = (s.surface.type == 1) ? 0.18f : (s.surface.type == 2 ? 0.22f : 0.25f);
+        s.surface.vx = goRight ? baseSpd : -baseSpd;
+        s.surface.x = goRight ? -30.0f : (float)(cols + 30);
+        s.surface.animTimer = 0.0f;
     }
 
     // 2. Seabed (Sand & Pebbles)
@@ -427,7 +492,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     }
 
     // 3. Seaweed Swaying
-    for (const auto& sw : data->aquaSeaweed) {
+    for (const auto& sw : s.seaweed) {
         for (int h = 0; h < sw.height; ++h) {
             int curY = sandRow - 1 - h;
             if (curY <= waveRow) break;
@@ -443,21 +508,21 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     }
 
     // 4. Seaweed Bubble Spawner
-    if (rand() % 15 == 0 && !data->aquaSeaweed.empty()) {
-        int swIdx = rand() % data->aquaSeaweed.size();
-        ScreenData::AquaBubble b;
-        b.x = (float)data->aquaSeaweed[swIdx].x;
+    if (rand() % 15 == 0 && !s.seaweed.empty()) {
+        int swIdx = rand() % s.seaweed.size();
+        AquaBubble b;
+        b.x = (float)s.seaweed[swIdx].x;
         b.y = (float)(sandRow - 2);
         b.speed = 0.35f + (float)(rand() % 30) / 100.0f;
         b.swaySpeed = 2.0f + (float)(rand() % 20) / 10.0f;
         b.swayPhase = (float)(rand() % 628) / 100.0f;
         int rType = rand() % 10;
         b.type = (rType < 5) ? 0 : (rType < 8 ? 1 : 2); // 0='.', 1='o', 2='O'
-        data->aquaBubbles.push_back(b);
+        s.bubbles.push_back(b);
     }
 
     // 5. Jellyfish
-    for (auto& j : data->aquaJelly) {
+    for (auto& j : s.jelly) {
         float pulseSpeed = (j.state == 0) ? 2.3f : 1.6f;
         j.pulsePhase += dt * pulseSpeed;
         float pulse = sinf(j.pulsePhase);
@@ -517,7 +582,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
     // 6. Crab on Seabed
     {
-        auto& crab = data->aquaCrab;
+        auto& crab = s.crab;
         crab.x += crab.vx * (dt * 25.0f);
         if (crab.x > cols - 8) {
             crab.x = (float)(cols - 8);
@@ -542,7 +607,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
     }
 
     // 7. Fish Simulation & Rendering
-    for (auto& f : data->aquaFish) {
+    for (auto& f : s.fish) {
         f.x += f.vx * (dt * 30.0f);
         bool goingRight = (f.vx > 0.0f);
 
@@ -559,14 +624,14 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
         // Random occasional mouth bubbles
         if (rand() % 120 == 0 && f.x > 2 && f.x < cols - 2) {
-            ScreenData::AquaBubble b;
+            AquaBubble b;
             b.x = goingRight ? f.x + 5.0f : f.x - 1.0f;
             b.y = f.y;
             b.speed = 0.4f + (float)(rand() % 25) / 100.0f;
             b.swaySpeed = 2.5f;
             b.swayPhase = (float)(rand() % 628) / 100.0f;
             b.type = (rand() % 2 == 0) ? 0 : 1;
-            data->aquaBubbles.push_back(b);
+            s.bubbles.push_back(b);
         }
 
         int fx = (int)f.x;
@@ -646,8 +711,8 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
     // 8. Bubbles Update & Rendering
     static const char BUBBLE_CHARS[] = { '.', 'o', 'O' };
-    for (size_t i = 0; i < data->aquaBubbles.size(); ) {
-        auto& b = data->aquaBubbles[i];
+    for (size_t i = 0; i < s.bubbles.size(); ) {
+        auto& b = s.bubbles[i];
         b.y -= b.speed * (dt * 30.0f);
         b.swayPhase += dt * b.swaySpeed;
         int bx = (int)roundf(b.x + sinf(b.swayPhase) * 1.4f);
@@ -655,7 +720,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
         if (by <= waveRow) {
             // Pop at water surface
-            data->aquaBubbles.erase(data->aquaBubbles.begin() + i);
+            s.bubbles.erase(s.bubbles.begin() + i);
         } else {
             char bChar = BUBBLE_CHARS[b.type % 3];
             putChar(bx, by, bChar, COL_BUBBLE);
@@ -688,3 +753,12 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         }
     }
 }
+
+REGISTER_SCREENSAVER(
+    24,
+    L"ASCIIQuarium",
+    "asciiquarium",
+    { "asciiquarium", "aquarium", "fish" },
+    WRAP_LEGACY(RenderASCIIQuarium),
+    {}
+);

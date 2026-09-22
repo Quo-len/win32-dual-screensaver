@@ -1,9 +1,43 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <vector>
 #include <cstdlib>
 #include <algorithm>
 #include <cstdio>
+
+struct SnakeParticle {
+    float x, y;
+    float vx, vy;
+    float life;
+    float maxLife;
+    COLORREF color;
+    wchar_t ch;
+};
+
+struct SnakeState {
+    bool initialized = false;
+    int cols = 0;
+    int rows = 0;
+    int cellSize = 0;
+    int offsetX = 0;
+    int offsetY = 0;
+    int theme = 0;
+    int score = 0;
+    int highScore = 0;
+    int applesEaten = 0;
+    int totalCells = 0;
+    DWORD lastMoveTick = 0;
+    DWORD winStartTime = 0;
+    bool isWon = false;
+    POINT food = { 0, 0 };
+    int stuckFrames = 0;
+    DWORD timeAccumulator = 0;
+    std::vector<POINT> body;
+    std::vector<int> cycle;
+    std::vector<uint8_t> occupied;
+    std::vector<SnakeParticle> particles;
+};
 
 // ---------------------------------------------------------------------------
 // Simple Plain ASCII Self-Playing Snake (Hamiltonian Tour AI)
@@ -134,7 +168,7 @@ static void GenerateHamiltonianCycle(int cols, int rows, std::vector<int>& outCy
 }
 
 // Food Spawning (Zero-allocation with linear probing)
-static void SpawnFood(ScreenData::SnakeState& s) {
+static void SpawnFood(SnakeState& s) {
     if ((int)s.body.size() >= s.totalCells) {
         s.isWon = true;
         s.winStartTime = GetTickCount();
@@ -156,7 +190,7 @@ static void SpawnFood(ScreenData::SnakeState& s) {
 }
 
 // Reset Game State
-static void ResetSnakeGame(ScreenData::SnakeState& s, int cols, int rows) {
+static void ResetSnakeGame(SnakeState& s, int cols, int rows) {
     s.cols = cols;
     s.rows = rows;
     s.totalCells = cols * rows;
@@ -197,7 +231,7 @@ static void ResetSnakeGame(ScreenData::SnakeState& s, int cols, int rows) {
 }
 
 // AI Decision: Hamiltonian path with safe shortcuts (Zero allocations)
-static POINT ChooseNextMove(const ScreenData::SnakeState& s) {
+static POINT ChooseNextMove(const SnakeState& s) {
     const POINT& head = s.body.front();
     const POINT& tail = s.body.back();
     int N = s.totalCells;
@@ -339,7 +373,7 @@ void RenderSnake(HDC memDC, ScreenData* data, int width, int height, const RECT&
 
     int playLeftChars = (termCols - playCols * 2) / 2;
 
-    auto& s = data->snake;
+    auto& s = data->GetCustomState<SnakeState>(27);
     if (!s.initialized || s.cols != playCols || s.rows != playRows) {
         ResetSnakeGame(s, playCols, playRows);
     }
@@ -490,3 +524,12 @@ void RenderSnake(HDC memDC, ScreenData* data, int width, int height, const RECT&
         TextOutA(memDC, winX * cw, winY * ch, winMsg, (int)strlen(winMsg));
     }
 }
+
+REGISTER_SCREENSAVER(
+    27,
+    L"Self-Playing Snake",
+    "snake",
+    { "snake", "ouroboros" },
+    WRAP_LEGACY(RenderSnake),
+    {}
+);

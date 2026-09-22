@@ -156,7 +156,6 @@
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="dual-screensaver.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="Renderers.h" />
     <ClInclude Include="ScreensaverRegistry.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="ScreenData.h" />

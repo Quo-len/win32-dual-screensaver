@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include "settings/SettingItem.h"
 
 struct ScreenData;
 
@@ -32,7 +33,7 @@ typedef void (*RenderCtxFn)(const RenderContext& ctx);
 // Legacy render function signature for backward compatibility
 typedef void (*RenderLegacyFn)(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 
-#include "settings/SettingItem.h"
+#define WRAP_LEGACY(fn) [](const RenderContext& ctx) { fn(ctx.hdc, ctx.data, ctx.width, ctx.height, ctx.rect); }
 
 // Metadata & execution descriptor for a screensaver
 struct ScreensaverDef {
@@ -45,6 +46,7 @@ struct ScreensaverDef {
 };
 
 namespace ScreensaverRegistry {
+    void Register(const ScreensaverDef& def);
     const std::vector<ScreensaverDef>& GetAll();
     int GetCount();
     const ScreensaverDef* GetById(int id);
@@ -52,3 +54,13 @@ namespace ScreensaverRegistry {
     const ScreensaverDef* FindByAlias(const char* alias);
     void Execute(int id, const RenderContext& ctx);
 }
+
+// Helper struct for automatic self-registration at static initialization time
+struct ScreensaverRegistrar {
+    ScreensaverRegistrar(const ScreensaverDef& def) {
+        ScreensaverRegistry::Register(def);
+    }
+};
+
+#define REGISTER_SCREENSAVER(...) \
+    static ::ScreensaverRegistrar s_auto_reg_screensaver_##__COUNTER__(ScreensaverDef{ __VA_ARGS__ });

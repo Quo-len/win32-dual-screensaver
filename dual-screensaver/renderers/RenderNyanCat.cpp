@@ -7,7 +7,8 @@
 // - High-performance span-batched GDI rendering with Consolas font
 
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "../assets/NyanCatFrames.h"
 #include <vector>
 #include <string>
@@ -15,6 +16,32 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+
+struct NyanStar {
+    float x, y;
+    float speed;
+    int type;
+    int phase;
+};
+
+struct NyanState {
+    bool initialized = false;
+    DWORD lastTick = 0;
+    DWORD startTime = 0;
+    int frameIndex = 0;
+    HFONT font = NULL;
+    int fontSize = 0;
+    int widthInChars = 0;
+    int heightInChars = 0;
+    std::vector<NyanStar> stars;
+
+    ~NyanState() {
+        if (font) {
+            DeleteObject(font);
+            font = NULL;
+        }
+    }
+};
 
 // Space & Cat Palette
 static const COLORREF COL_SPACE_BG    = RGB(0,   38,  80);   // Deep space navy (#002650)
@@ -95,28 +122,30 @@ static inline CellStyle GetNyanStyle(char code) {
 }
 
 // Initialize / reinitialize screensaver state
-static void InitNyanCat(ScreenData* data, int numCells, int rows) {
-    data->nyanInitialized = true;
-    data->nyanStartTime = GetTickCount();
-    data->nyanLastTick = data->nyanStartTime;
-    data->nyanFrameIndex = 0;
+static void InitNyanCat(NyanState& s, int numCells, int rows) {
+    s.initialized = true;
+    s.startTime = GetTickCount();
+    s.lastTick = s.startTime;
+    s.frameIndex = 0;
 
-    data->nyanStars.clear();
+    s.stars.clear();
     int starCount = (std::max)(50, (numCells * rows) / 45);
-    data->nyanStars.reserve(starCount);
+    s.stars.reserve(starCount);
 
     for (int i = 0; i < starCount; ++i) {
-        ScreenData::NyanStar star;
+        NyanStar star;
         star.x = (float)(rand() % (std::max)(1, numCells + 20) - 10);
         star.y = (float)(rand() % rows);
         star.speed = 0.35f + (float)(rand() % 45) / 100.0f; // drifting warp speed
         star.type = rand() % 3; // 0 = single dot, 1 = diamond, 2 = cross
         star.phase = rand() % 60;
-        data->nyanStars.push_back(star);
+        s.stars.push_back(star);
     }
 }
 
 void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& s = data->GetCustomState<NyanState>(26);
+
     // 1. Font Selection
     int targetFontH;
     if (data->isPreview) {
@@ -125,19 +154,19 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
         targetFontH = (height >= 1400) ? 20 : 16;
     }
 
-    if (data->nyanFont == NULL || data->nyanFontSize != targetFontH) {
-        if (data->nyanFont) {
-            DeleteObject(data->nyanFont);
-            data->nyanFont = NULL;
+    if (s.font == NULL || s.fontSize != targetFontH) {
+        if (s.font) {
+            DeleteObject(s.font);
+            s.font = NULL;
         }
-        data->nyanFontSize = targetFontH;
-        data->nyanFont = CreateFontA(
+        s.fontSize = targetFontH;
+        s.font = CreateFontA(
             targetFontH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
     }
 
-    HFONT hOldFont = (HFONT)SelectObject(memDC, data->nyanFont);
+    HFONT hOldFont = (HFONT)SelectObject(memDC, s.font);
     SetBkMode(memDC, OPAQUE);
 
     TEXTMETRIC tm;
@@ -155,32 +184,32 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
     int numCells = cols / 2; // Each Nyan Cat cell is 2 characters wide for square 1:1 aspect ratio
 
     // 2. Initialize or reinitialize on resize
-    if (!data->nyanInitialized || data->nyanWidthInChars != cols || data->nyanHeightInChars != rows) {
-        data->nyanWidthInChars = cols;
-        data->nyanHeightInChars = rows;
-        InitNyanCat(data, numCells, rows);
+    if (!s.initialized || s.widthInChars != cols || s.heightInChars != rows) {
+        s.widthInChars = cols;
+        s.heightInChars = rows;
+        InitNyanCat(s, numCells, rows);
     }
 
     DWORD now = GetTickCount();
 
     // 3. Advance Animation Frame (~11.5 FPS, authentic Nyan Cat timing)
-    if (now - data->nyanLastTick >= 85) {
-        int framesToAdvance = (int)((now - data->nyanLastTick) / 85);
-        data->nyanFrameIndex = (data->nyanFrameIndex + framesToAdvance) % 12;
-        data->nyanLastTick = now;
+    if (now - s.lastTick >= 85) {
+        int framesToAdvance = (int)((now - s.lastTick) / 85);
+        s.frameIndex = (s.frameIndex + framesToAdvance) % 12;
+        s.lastTick = now;
     }
 
-    int frameIdx = data->nyanFrameIndex;
+    int frameIdx = s.frameIndex;
 
     // 4. Update Starfield Positions
-    for (auto& s : data->nyanStars) {
-        s.x -= s.speed;
-        s.phase = (s.phase + 1) % 60;
-        if (s.x < -15.0f) {
-            s.x = (float)(numCells + (rand() % 10));
-            s.y = (float)(rand() % rows);
-            s.speed = 0.35f + (float)(rand() % 45) / 100.0f;
-            s.type = rand() % 3;
+    for (auto& star : s.stars) {
+        star.x -= star.speed;
+        star.phase = (star.phase + 1) % 60;
+        if (star.x < -15.0f) {
+            star.x = (float)(numCells + (rand() % 10));
+            star.y = (float)(rand() % rows);
+            star.speed = 0.35f + (float)(rand() % 45) / 100.0f;
+            star.type = rand() % 3;
         }
     }
 
@@ -196,10 +225,10 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
     std::vector<ScreenCell> grid((size_t)(numCells * rows));
 
     // 6. Draw Drifting Stars into Background
-    for (const auto& s : data->nyanStars) {
-        int sx = (int)roundf(s.x);
-        int sy = (int)roundf(s.y);
-        int twinkle = (s.phase / 6) % 4;
+    for (const auto& star : s.stars) {
+        int sx = (int)roundf(star.x);
+        int sy = (int)roundf(star.y);
+        int twinkle = (star.phase / 6) % 4;
 
         auto putStarCell = [&](int cx, int cy, char ch1, char ch2, COLORREF col) {
             if (cx >= 0 && cx < numCells && cy >= 0 && cy < rows) {
@@ -213,10 +242,10 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
             }
         };
 
-        if (s.type == 0) { // Single twinkle star
+        if (star.type == 0) { // Single twinkle star
             char ch = (twinkle == 0) ? '*' : ((twinkle == 1) ? '+' : '.');
             putStarCell(sx, sy, ch, ' ', COL_STAR_WHITE);
-        } else if (s.type == 1) { // Cross star
+        } else if (star.type == 1) { // Cross star
             if (twinkle == 0) {
                 putStarCell(sx, sy, '*', '*', COL_STAR_WHITE);
             } else if (twinkle == 1 || twinkle == 3) {
@@ -300,7 +329,7 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
 
     // 9. Authentic Bottom Counter: "You have nyaned for X seconds!"
     if (!data->isPreview) {
-        DWORD nyanSeconds = (now - data->nyanStartTime) / 1000;
+        DWORD nyanSeconds = (now - s.startTime) / 1000;
         char counterBuf[64];
         int counterLen = sprintf_s(counterBuf, "You have nyaned for %lu seconds!", (unsigned long)nyanSeconds);
 
@@ -356,3 +385,12 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
 
     SelectObject(memDC, hOldFont);
 }
+
+REGISTER_SCREENSAVER(
+    26,
+    L"Nyan Cat (ASCII)",
+    "nyancat",
+    { "nyancat", "nyan", "cat" },
+    WRAP_LEGACY(RenderNyanCat),
+    {}
+);

@@ -4,8 +4,6 @@
 #include "ConfigUI.h"
 #include "Settings.h"
 #include "ScreenData.h"
-#include "utils/Perlin.h"
-#include "Renderers.h"
 #include "Benchmark.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -407,14 +405,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 				FIXED_PITCH | FF_MODERN, "Consolas");
 
-			data->hMatrixFont = CreateFontW(data->isPreview ? 10 : g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
-				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-				FIXED_PITCH | FF_MODERN, L"MS Gothic");
-
 			data->startTime = GetTickCount64();
-
-			unsigned int monitorSeed = (unsigned int)GetTickCount64() + (rand() % 10000);
-			initPerlin(monitorSeed, data->perm);
 		}
 		SetTimer(hWnd, 1, 33, NULL);
 		break;
@@ -523,8 +514,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		if (data) {
 			if (data->hFont) DeleteObject(data->hFont);
-			if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
-			if (data->nyanFont) DeleteObject(data->nyanFont);
 			delete data;
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
 		}

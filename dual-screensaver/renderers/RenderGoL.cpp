@@ -1,8 +1,16 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/GolSettings.h"
+
+struct GolState {
+    DWORD lastUpdate = 0;
+};
 
 void RenderGoL(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<GolState>(1);
+
     int targetCols = width / g_GolCellSize;
     int targetRows = height / g_GolCellSize;
 
@@ -26,8 +34,8 @@ void RenderGoL(HDC memDC, ScreenData* data, int width, int height, const RECT& r
         }
     }
 
-    DWORD now = GetTickCount64();
-    if (now - data->lastGolUpdate >= (DWORD)g_GolSpeed) {
+    DWORD now = (DWORD)GetTickCount64();
+    if (now - state.lastUpdate >= (DWORD)g_GolSpeed) {
         unsigned char* grid = data->grid.data();
         unsigned char* next = data->nextGrid.data();
         int stride = data->stride;
@@ -72,7 +80,7 @@ void RenderGoL(HDC memDC, ScreenData* data, int width, int height, const RECT& r
         }
 
         data->grid.swap(data->nextGrid);
-        data->lastGolUpdate = now;
+        state.lastUpdate = now;
     }
 
     uint32_t* px = data->pixels.data();
@@ -97,3 +105,12 @@ void RenderGoL(HDC memDC, ScreenData* data, int width, int height, const RECT& r
     StretchDIBits(memDC, 0, 0, width, height, 0, 0, data->cols, data->rows,
         data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(
+    1,
+    L"Game of Life",
+    "gol",
+    { "gol", "life", "gameoflife" },
+    WRAP_LEGACY(RenderGoL),
+    GetGolSettings()
+);

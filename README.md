@@ -36,7 +36,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 29 p
 | 13  | **ASCII Fire**           | Classic Doom-style fire simulation rendered with ASCII density glyphs      |
 | 14  | **Hex Memory Dump**      | Cyberpunk-style animated memory buffer scanner                             |
 | 15  | **Sorting Algorithms**   | Real-time step-by-step visualizations of classic sorting routines          |
-| 16  | **Langton's Ant**        | Multi-agent symmetrical cellular automata creating intricate tapestries    |
+| 16  | **Langton's Ant**        | Multi-agent cellular automata creating intricate tapestries                |
 | 17  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors  |
 | 18  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black       |
 | 19  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette          |
@@ -47,7 +47,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 29 p
 | 24  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp   |
 | 25  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
 | 26  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
-| 27  | **Self-Playing Snake**   | Autonomous snake with spanning-tree Hamiltonian pathing, shortcuts & glow   |
+| 27  | **Self-Playing Snake**   | Autonomous snake with spanning-tree Hamiltonian pathing, shortcuts & glow  |
 
 ---
 
@@ -150,17 +150,17 @@ Settings are managed via a dedicated graphical window and saved to the registry:
 
 The screensaver executable supports standard Windows screensaver flags as well as custom switches:
 
-| Flag                        | Purpose                                                            | Example                                     |
-| --------------------------- | ------------------------------------------------------------------ | ------------------------------------------- |
-| `/s`                        | Runs fullscreen screensaver on all monitors (default behavior)     | `DualScreenSaver.exe /s`                    |
-| `/4k`                       | Renders screensaver in full 4K (3840x2160) canvas                  | `DualScreenSaver.exe /s /4k`                |
-| `/c`                        | Opens the graphical Settings configuration dialog                  | `DualScreenSaver.exe /c`                    |
-| `/pool`                     | Opens the Randomizer Pool checklist dialog directly                | `DualScreenSaver.exe /pool`                 |
-| `/p <HWND>`                 | Renders preview inside parent window handle                        | `DualScreenSaver.exe /p 123456`             |
-| `/debug`                    | Launches with live Performance HUD overlay enabled by default      | `DualScreenSaver.exe /debug`                |
-| `--benchmark [4k]`          | Runs headless benchmark & GDI leak test on all modes (1080p or 4K)  | `DualScreenSaver.exe --benchmark 4k`        |
-| `--benchmark visual [4k]`   | Runs on-screen visual benchmark showcase (1080p or 4K)             | `DualScreenSaver.exe --benchmark visual 4k` |
-| `<mode1> [mode2]`           | Launch immediately with specific modes by name                     | `DualScreenSaver.exe matrix earth`          |
+| Flag                      | Purpose                                                            | Example                                     |
+| ------------------------- | ------------------------------------------------------------------ | ------------------------------------------- |
+| `/s`                      | Runs fullscreen screensaver on all monitors (default behavior)     | `DualScreenSaver.exe /s`                    |
+| `/4k`                     | Renders screensaver in full 4K (3840x2160) canvas                  | `DualScreenSaver.exe /s /4k`                |
+| `/c`                      | Opens the graphical Settings configuration dialog                  | `DualScreenSaver.exe /c`                    |
+| `/pool`                   | Opens the Randomizer Pool checklist dialog directly                | `DualScreenSaver.exe /pool`                 |
+| `/p <HWND>`               | Renders preview inside parent window handle                        | `DualScreenSaver.exe /p 123456`             |
+| `/debug`                  | Launches with live Performance HUD overlay enabled by default      | `DualScreenSaver.exe /debug`                |
+| `--benchmark [4k]`        | Runs headless benchmark & GDI leak test on all modes (1080p or 4K) | `DualScreenSaver.exe --benchmark 4k`        |
+| `--benchmark visual [4k]` | Runs on-screen visual benchmark showcase (1080p or 4K)             | `DualScreenSaver.exe --benchmark visual 4k` |
+| `<mode1> [mode2]`         | Launch immediately with specific modes by name                     | `DualScreenSaver.exe matrix earth`          |
 
 > [!TIP]
 > **Live Diagnostics HUD**: Press **`F5`** at any time while the screensaver is running to toggle the real-time Performance HUD (frame time latency in ms, FPS capacity, GDI handle count, and memory usage).

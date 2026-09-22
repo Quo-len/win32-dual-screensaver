@@ -1,11 +1,18 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
 #include <math.h>
 #include <vector>
 #include <string>
 
+struct JuliaState {
+    float A = 0.0f;
+};
+
 void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<JuliaState>(5);
+
     SelectObject(memDC, data->hFont);
     TEXTMETRICA tm;
     GetTextMetricsA(memDC, &tm);
@@ -17,7 +24,7 @@ void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT&
 
     std::vector<char> b(W * H, ' ');
 
-    double zoom = 1.0 + 0.15 * sin(data->A * 0.3);
+    double zoom = 1.0 + 0.15 * sin(state.A * 0.3);
     double widthInComplex = 3.5 / zoom;
     double heightInComplex = widthInComplex * ((double)H / W) * 2.0;
 
@@ -27,8 +34,8 @@ void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT&
     double dx = widthInComplex / W;
     double dy = heightInComplex / H;
 
-    double cx = 0.7885 * cos(data->A * 0.5);
-    double cy = 0.7885 * sin(data->A * 0.5);
+    double cx = 0.7885 * cos(state.A * 0.5);
+    double cy = 0.7885 * sin(state.A * 0.5);
 
     const char* charset = " .,-~:;=!*#$@";
     const char* insideChars = "WM#0@&8Q";
@@ -72,5 +79,14 @@ void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT&
     textRect.top = (textRect.bottom - textHeight) / 2;
     DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
-    data->A += g_ASpeed * 0.5f;
+    state.A += g_ASpeed * 0.5f;
 }
+
+REGISTER_SCREENSAVER(
+    5,
+    L"Julia Spirals",
+    "julia",
+    { "julia", "spirals" },
+    WRAP_LEGACY(RenderJulia),
+    {}
+);

@@ -1,5 +1,6 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <math.h>
 
 // ---------------------------------------------------------------------------
@@ -67,8 +68,19 @@ static COLORREF mandColor(double t) {
 //   - Complex-plane step accounts for character aspect ratio so the fractal
 //     is geometrically correct (not stretched/squashed).
 // ---------------------------------------------------------------------------
+struct MandelbrotState {
+    double mandCX = -0.74364990000;
+    double mandCY = 0.13182590000;
+    double mandScale = 3.5;
+    double mandPalOff = 0.0;
+    int mandTargetIdx = 0;
+    DWORD mandLastTick = 0;
+};
+
 void RenderMandelbrot(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
+
+    auto& state = data->GetCustomState<MandelbrotState>(19);
 
     // --- Character grid setup ---
     SelectObject(memDC, data->hFont);
@@ -83,29 +95,29 @@ void RenderMandelbrot(HDC memDC, ScreenData* data, int width, int height, const 
     if (cols <= 0 || rows <= 0) return;
 
     // --- Init / reinit on resize or first use ---
-    if (data->cols != cols || data->rows != rows) {
+    if (data->cols != cols || data->rows != rows || state.mandLastTick == 0) {
         data->cols          = cols;
         data->rows          = rows;
-        data->mandCX        = TARGETS[0].cx;
-        data->mandCY        = TARGETS[0].cy;
-        data->mandScale     = 3.5;
-        data->mandTargetIdx = 0;
-        data->mandLastTick  = GetTickCount();
-        data->mandPalOff    = 0.0;
+        state.mandCX        = TARGETS[0].cx;
+        state.mandCY        = TARGETS[0].cy;
+        state.mandScale     = 3.5;
+        state.mandTargetIdx = 0;
+        state.mandLastTick  = GetTickCount();
+        state.mandPalOff    = 0.0;
     }
 
     // --- Frame-rate-independent timing ---
     DWORD  now   = GetTickCount();
-    double dtMs  = (double)(int)(now - data->mandLastTick);
-    data->mandLastTick = now;
+    double dtMs  = (double)(int)(now - state.mandLastTick);
+    state.mandLastTick = now;
     if (dtMs < 0.0)   dtMs = 0.0;
     if (dtMs > 200.0) dtMs = 200.0; // clamp for pauses / debugger
 
     // Zoom 1.5 % per 33-ms frame: scale *= exp(-ln(1/0.985) * dt/33.333)
-    data->mandScale  *= exp(-0.015114 * dtMs / 33.333);
+    state.mandScale  *= exp(-0.015114 * dtMs / 33.333);
 
     // Palette rotates one full cycle in ~40 s at 30 fps
-    data->mandPalOff += dtMs * 0.000025;
+    state.mandPalOff += dtMs * 0.000025;
 
     // --- Complex-plane mapping ---
     // dx/dy are the complex-plane step per character column / row.
@@ -116,14 +128,14 @@ void RenderMandelbrot(HDC memDC, ScreenData* data, int width, int height, const 
     const double LOG_8L2 = log(8.0 * LOG2);     // pre-computed for smooth colouring
     const int    MXITER  = 200;
 
-    double sc  = data->mandScale;
-    double cx  = data->mandCX;
-    double cy  = data->mandCY;
+    double sc  = state.mandScale;
+    double cx  = state.mandCX;
+    double cy  = state.mandCY;
     double dx  = sc * cw / height;  // complex units per char-column
     double dy  = sc * ch / height;  // complex units per char-row
     double x0  = cx - 0.5 * cols * dx;
     double y0  = cy - 0.5 * rows * dy;
-    double pal = data->mandPalOff;
+    double pal = state.mandPalOff;
 
     // ASCII density ramp: space (fast-escape, outer) → dense (slow-escape, boundary)
     static const char DENS[] = " .,:;+=*#%@W";
@@ -183,10 +195,12 @@ void RenderMandelbrot(HDC memDC, ScreenData* data, int width, int height, const 
     }
 
     // Switch to next target when double precision gives out
-    if (data->mandScale < TARGETS[data->mandTargetIdx].minScale) {
-        data->mandTargetIdx = (data->mandTargetIdx + 1) % NUM_TARGETS;
-        data->mandCX    = TARGETS[data->mandTargetIdx].cx;
-        data->mandCY    = TARGETS[data->mandTargetIdx].cy;
-        data->mandScale = 3.5;
+    if (state.mandScale < TARGETS[state.mandTargetIdx].minScale) {
+        state.mandTargetIdx = (state.mandTargetIdx + 1) % NUM_TARGETS;
+        state.mandCX    = TARGETS[state.mandTargetIdx].cx;
+        state.mandCY    = TARGETS[state.mandTargetIdx].cy;
+        state.mandScale = 3.5;
     }
 }
+
+REGISTER_SCREENSAVER(19, L"Mandelbrot Zoom", "mandelbrot", { "mandelbrot", "mandel" }, WRAP_LEGACY(RenderMandelbrot), {});

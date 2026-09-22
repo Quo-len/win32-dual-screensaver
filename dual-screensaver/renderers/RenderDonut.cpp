@@ -1,11 +1,20 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/DonutSettings.h"
 #include <math.h>
 #include <vector>
 #include <string>
 
+struct DonutState {
+    float A = 0.0f;
+    float B = 0.0f;
+};
+
 void RenderDonut(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<DonutState>(0);
+
     SelectObject(memDC, data->hFont);
     TEXTMETRICA tm;
     GetTextMetricsA(memDC, &tm);
@@ -25,10 +34,10 @@ void RenderDonut(HDC memDC, ScreenData* data, int width, int height, const RECT&
 
     for (float j = 0; j < 6.28f; j += 0.07f) {
         for (float i = 0; i < 6.28f; i += 0.02f) {
-            float c = sin(i), d = cos(j), e = sin(data->A), f = sin(j), g = cos(data->A);
+            float c = sin(i), d = cos(j), e = sin(state.A), f = sin(j), g = cos(state.A);
             float h = d + g_DonutSize;
             float D = 1 / (c * h * e + f * g + K2);
-            float l = cos(i), m = cos(data->B), n = sin(data->B);
+            float l = cos(i), m = cos(state.B), n = sin(state.B);
             float t = c * h * g - f * e;
 
             int x = (W / 2) + (int)(x_mult * D * (l * h * m - t * n));
@@ -59,6 +68,15 @@ void RenderDonut(HDC memDC, ScreenData* data, int width, int height, const RECT&
     textRect.top = (textRect.bottom - textHeight) / 2;
     DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
-    data->A += g_ASpeed;
-    data->B += g_BSpeed;
+    state.A += g_ASpeed;
+    state.B += g_BSpeed;
 }
+
+REGISTER_SCREENSAVER(
+    0,
+    L"Donut",
+    "donut",
+    { "donut" },
+    WRAP_LEGACY(RenderDonut),
+    GetDonutSettings()
+);

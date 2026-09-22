@@ -1,14 +1,30 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/CurlSettings.h"
 #include "../utils/Perlin.h"
 #include <math.h>
+
+struct FlowParticle {
+    float x, y;
+    float prev_x, prev_y;
+    int life;
+};
+
+struct CurlState {
+    std::vector<FlowParticle> flowParticles;
+    float flowZOff = 0.0f;
+    int perm[512] = { 0 };
+    bool initialized = false;
+};
 
 void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
 
-    // We reuse flowParticles. Check if we need to initialize or resize.
-    if (data->cols != width || data->rows != height || data->pixels.empty() || (int)data->flowParticles.size() != g_CurlCount) {
+    auto& state = data->GetCustomState<CurlState>(21);
+
+    if (data->cols != width || data->rows != height || data->pixels.empty() || (int)state.flowParticles.size() != g_CurlCount || !state.initialized) {
         data->cols = width;
         data->rows = height;
         data->pixels.assign(width * height, 0xFF000000);
@@ -16,8 +32,8 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
         int numParticles = g_CurlCount;
         if (numParticles <= 0) numParticles = 1000;
 
-        data->flowParticles.resize(numParticles);
-        for (auto& p : data->flowParticles) {
+        state.flowParticles.resize(numParticles);
+        for (auto& p : state.flowParticles) {
             p.x = (float)(rand() % width);
             p.y = (float)(rand() % height);
             p.prev_x = p.x;
@@ -26,7 +42,8 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
         }
 
         // Initialize perlin permutations
-        initPerlin(GetTickCount(), data->perm);
+        initPerlin(GetTickCount(), state.perm);
+        state.initialized = true;
     }
 
     uint32_t* px = data->pixels.data();
@@ -48,7 +65,7 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
     }
 
     // Slowly move forward in the Z axis of the noise field
-    data->flowZOff += 0.001f;
+    state.flowZOff += 0.001f;
 
     // We'll use PerlinScale for the spatial frequency
     // If it's too small, the curl will look flat, so we boost it a bit specifically for curl
@@ -57,20 +74,20 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
 
     const float eps = 0.001f; // epsilon for numerical derivative
 
-    int particleCount = (int)data->flowParticles.size();
+    int particleCount = (int)state.flowParticles.size();
     for (int i = 0; i < particleCount; i++) {
-        auto& p = data->flowParticles[i];
+        auto& p = state.flowParticles[i];
 
         // Current mapped position
         float nx = p.x * scale;
         float ny = p.y * scale;
 
         // Compute numerical derivatives of the noise field
-        float n_y1 = perlin(nx, ny + eps, data->flowZOff, data->perm);
-        float n_y0 = perlin(nx, ny - eps, data->flowZOff, data->perm);
+        float n_y1 = perlin(nx, ny + eps, state.flowZOff, state.perm);
+        float n_y0 = perlin(nx, ny - eps, state.flowZOff, state.perm);
         
-        float n_x1 = perlin(nx + eps, ny, data->flowZOff, data->perm);
-        float n_x0 = perlin(nx - eps, ny, data->flowZOff, data->perm);
+        float n_x1 = perlin(nx + eps, ny, state.flowZOff, state.perm);
+        float n_x0 = perlin(nx - eps, ny, state.flowZOff, state.perm);
 
         // Curl is (dy, -dx)
         float dy = (n_y1 - n_y0) / (2.0f * eps);
@@ -136,3 +153,5 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
     SetDIBitsToDevice(memDC, rect.left, rect.top, width, height,
         0, 0, 0, height, data->pixels.data(), &bmi, DIB_RGB_COLORS);
 }
+
+REGISTER_SCREENSAVER(21, L"Curl Noise Particles", "curl", { "curl", "noise", "particles" }, WRAP_LEGACY(RenderCurlNoise), GetCurlSettings());

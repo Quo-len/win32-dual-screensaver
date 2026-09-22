@@ -1,10 +1,47 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <vector>
 #include <string>
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+
+struct BonsaiCell {
+    char ch = ' ';
+    COLORREF color = 0;
+};
+
+struct BonsaiShoot {
+    float x, y;
+    float dx, dy;
+    int age;
+    int maxAge;
+    int generation;
+    int thickness;
+};
+
+struct BonsaiPetal {
+    float x, y;
+    float vx, vy;
+    float phase;
+    char ch;
+    COLORREF color;
+};
+
+struct BonsaiState {
+    bool initialized = false;
+    DWORD lastTick = 0;
+    int widthInChars = 0;
+    int heightInChars = 0;
+    int state = 0; // 0: growing, 1: mature/petals, 2: renew
+    DWORD stateStartTime = 0;
+    int theme = 0; // 0: Spring, 1: Sakura, 2: Autumn, 3: Ginkgo
+    std::vector<BonsaiCell> grid;
+    std::vector<BonsaiShoot> activeShoots;
+    std::vector<BonsaiPetal> petals;
+    std::vector<POINT> leaves;
+};
 
 // Pot and Soil Colors
 static const COLORREF COL_POT_OUTER = RGB(170, 95, 45);
@@ -46,17 +83,18 @@ static COLORREF GetFoliageColor(int theme) {
     }
 }
 
-static void DrawPot(ScreenData* data, int cols, int rows, int potY, int potHalfW) {
+static void DrawPot(BonsaiState& s, int cols, int rows, int potY, int potHalfW) {
     auto putCell = [&](int x, int y, char c, COLORREF col) {
         if (x >= 0 && x < cols && y >= 0 && y < rows) {
-            data->bonsaiGrid[y * cols + x].ch = c;
-            data->bonsaiGrid[y * cols + x].color = col;
+            s.grid[y * cols + x].ch = c;
+            s.grid[y * cols + x].color = col;
         }
     };
 
     int cx = cols / 2;
     int left = cx - potHalfW;
     int right = cx + potHalfW;
+
 
     // Rim: (---___________________---)
     putCell(left,     potY, '(', COL_POT_RIM);
@@ -98,9 +136,9 @@ static void DrawPot(ScreenData* data, int cols, int rows, int potY, int potHalfW
     putCell(right - 4, potY + 3, '|', COL_POT_OUTER);
 }
 
-static void AddFoliageCluster(ScreenData* data, int cx, int cy, int radius) {
-    int cols = data->bonsaiWidthInChars;
-    int rows = data->bonsaiHeightInChars;
+static void AddFoliageCluster(BonsaiState& s, int cx, int cy, int radius) {
+    int cols = s.widthInChars;
+    int rows = s.heightInChars;
     static const char LEAF_CHARS[] = { '&', '~', '*', '%', '@' };
 
     for (int dy = -radius; dy <= radius; ++dy) {
@@ -112,13 +150,13 @@ static void AddFoliageCluster(ScreenData* data, int cx, int cy, int radius) {
                     int y = cy + dy;
                     if (x >= 0 && x < cols && y >= 0 && y < rows) {
                         // Don't overwrite wood trunk if it's already there
-                        char cur = data->bonsaiGrid[y * cols + x].ch;
+                        char cur = s.grid[y * cols + x].ch;
                         if (cur == ' ' || cur == '~' || cur == '*' || cur == '&' || cur == '%') {
                             char ch = LEAF_CHARS[rand() % 5];
-                            data->bonsaiGrid[y * cols + x].ch = ch;
-                            data->bonsaiGrid[y * cols + x].color = GetFoliageColor(data->bonsaiTheme);
+                            s.grid[y * cols + x].ch = ch;
+                            s.grid[y * cols + x].color = GetFoliageColor(s.theme);
                             POINT pt = { x, y };
-                            data->bonsaiLeaves.push_back(pt);
+                            s.leaves.push_back(pt);
                         }
                     }
                 }
@@ -127,25 +165,25 @@ static void AddFoliageCluster(ScreenData* data, int cx, int cy, int radius) {
     }
 }
 
-static void StartNewBonsai(ScreenData* data, int cols, int rows) {
-    data->bonsaiWidthInChars = cols;
-    data->bonsaiHeightInChars = rows;
-    data->bonsaiGrid.assign(cols * rows, ScreenData::BonsaiCell());
-    data->bonsaiActiveShoots.clear();
-    data->bonsaiPetals.clear();
-    data->bonsaiLeaves.clear();
+static void StartNewBonsai(BonsaiState& s, int cols, int rows) {
+    s.widthInChars = cols;
+    s.heightInChars = rows;
+    s.grid.assign(cols * rows, BonsaiCell());
+    s.activeShoots.clear();
+    s.petals.clear();
+    s.leaves.clear();
 
     // Random theme: 0=Spring, 1=Sakura, 2=Autumn, 3=Ginkgo
-    data->bonsaiTheme = rand() % 4;
+    s.theme = rand() % 4;
 
     int potY = rows - 6;
     int potHalfW = (std::min)(22, cols / 4);
     if (potHalfW < 12) potHalfW = 12;
 
-    DrawPot(data, cols, rows, potY, potHalfW);
+    DrawPot(s, cols, rows, potY, potHalfW);
 
     // Root shoot at base of trunk
-    ScreenData::BonsaiShoot root;
+    BonsaiShoot root;
     root.x = (float)(cols / 2);
     root.y = (float)(potY - 2);
     root.dx = ((float)(rand() % 20) - 10.0f) / 50.0f; // slight natural lean
@@ -154,34 +192,34 @@ static void StartNewBonsai(ScreenData* data, int cols, int rows) {
     root.maxAge = (int)(rows * 0.35f + (rand() % 5));
     root.generation = 0;
     root.thickness = 3;
-    data->bonsaiActiveShoots.push_back(root);
+    s.activeShoots.push_back(root);
 
-    data->bonsaiState = 0; // Growing
-    data->bonsaiStateStartTime = GetTickCount();
-    data->bonsaiLastTick = GetTickCount();
-    data->bonsaiInitialized = true;
+    s.state = 0; // Growing
+    s.stateStartTime = GetTickCount();
+    s.lastTick = GetTickCount();
+    s.initialized = true;
 }
 
-static void StepGrowth(ScreenData* data) {
-    if (data->bonsaiActiveShoots.empty()) {
+static void StepGrowth(BonsaiState& s) {
+    if (s.activeShoots.empty()) {
         // Growth finished, transition to mature serene phase
-        data->bonsaiState = 1; // Mature / Petals
-        data->bonsaiStateStartTime = GetTickCount();
+        s.state = 1; // Mature / Petals
+        s.stateStartTime = GetTickCount();
         return;
     }
 
-    int cols = data->bonsaiWidthInChars;
-    int rows = data->bonsaiHeightInChars;
-    std::vector<ScreenData::BonsaiShoot> nextShoots;
+    int cols = s.widthInChars;
+    int rows = s.heightInChars;
+    std::vector<BonsaiShoot> nextShoots;
 
     auto putCell = [&](int x, int y, char c, COLORREF col) {
         if (x >= 0 && x < cols && y >= 0 && y < rows) {
-            data->bonsaiGrid[y * cols + x].ch = c;
-            data->bonsaiGrid[y * cols + x].color = col;
+            s.grid[y * cols + x].ch = c;
+            s.grid[y * cols + x].color = col;
         }
     };
 
-    for (auto& shoot : data->bonsaiActiveShoots) {
+    for (auto& shoot : s.activeShoots) {
         // Draw wood at current position
         int ix = (int)roundf(shoot.x);
         int iy = (int)roundf(shoot.y);
@@ -218,13 +256,13 @@ static void StepGrowth(ScreenData* data) {
         if (shoot.age >= shoot.maxAge || shoot.y <= 4.0f) {
             // Bloom foliage at termination
             int radius = (shoot.generation <= 1) ? 3 : 2;
-            AddFoliageCluster(data, ix, iy, radius);
+            AddFoliageCluster(s, ix, iy, radius);
         } else {
             // Bifurcation / Branching probability
             bool shouldBranch = (shoot.age > 4 && rand() % 100 < (22 - shoot.generation * 4));
             if (shouldBranch && shoot.generation < 3) {
                 // Spawn two child branches
-                ScreenData::BonsaiShoot b1 = shoot;
+                BonsaiShoot b1 = shoot;
                 b1.generation = shoot.generation + 1;
                 b1.thickness = (std::max)(1, shoot.thickness - 1);
                 b1.age = 0;
@@ -233,7 +271,7 @@ static void StepGrowth(ScreenData* data) {
                 b1.dy = shoot.dy * 0.85f;
                 nextShoots.push_back(b1);
 
-                ScreenData::BonsaiShoot b2 = shoot;
+                BonsaiShoot b2 = shoot;
                 b2.generation = shoot.generation + 1;
                 b2.thickness = (std::max)(1, shoot.thickness - 1);
                 b2.age = 0;
@@ -244,7 +282,7 @@ static void StepGrowth(ScreenData* data) {
 
                 // Add foliage node at bifurcation
                 if (rand() % 2 == 0) {
-                    AddFoliageCluster(data, ix, iy, 1);
+                    AddFoliageCluster(s, ix, iy, 1);
                 }
             } else {
                 nextShoots.push_back(shoot);
@@ -252,10 +290,12 @@ static void StepGrowth(ScreenData* data) {
         }
     }
 
-    data->bonsaiActiveShoots = nextShoots;
+    s.activeShoots = nextShoots;
 }
 
 void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& s = data->GetCustomState<BonsaiState>(25);
+
     SelectObject(memDC, data->hFont);
     SetBkMode(memDC, OPAQUE);
     SetBkColor(memDC, RGB(0, 0, 0));
@@ -272,45 +312,45 @@ void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT
     if (cols < 24) cols = 24;
     if (rows < 15) rows = 15;
 
-    if (!data->bonsaiInitialized || data->bonsaiWidthInChars != cols || data->bonsaiHeightInChars != rows) {
-        StartNewBonsai(data, cols, rows);
+    if (!s.initialized || s.widthInChars != cols || s.heightInChars != rows) {
+        StartNewBonsai(s, cols, rows);
     }
 
     DWORD now = GetTickCount();
-    float dt = (now - data->bonsaiLastTick) / 1000.0f;
+    float dt = (now - s.lastTick) / 1000.0f;
     if (dt <= 0.0f || dt > 0.1f) dt = 0.033f;
-    data->bonsaiLastTick = now;
+    s.lastTick = now;
 
     // Fill screen with black
     FillRect(memDC, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
 
     // Growth / Lifecycle State Machine
-    if (data->bonsaiState == 0) {
+    if (s.state == 0) {
         // Growth phase: advance 1-2 steps per frame for organic pacing
-        StepGrowth(data);
-        if (rand() % 2 == 0) StepGrowth(data);
-    } else if (data->bonsaiState == 1) {
+        StepGrowth(s);
+        if (rand() % 2 == 0) StepGrowth(s);
+    } else if (s.state == 1) {
         // Mature serene phase: gentle foliage rustle & drifting petals/leaves
-        DWORD elapsed = now - data->bonsaiStateStartTime;
+        DWORD elapsed = now - s.stateStartTime;
 
         // Subtle foliage shimmer / rustle in the breeze
-        if (!data->bonsaiLeaves.empty() && (rand() % 3 == 0)) {
+        if (!s.leaves.empty() && (rand() % 3 == 0)) {
             int flutterCount = 1 + (rand() % 3);
             for (int k = 0; k < flutterCount; ++k) {
-                const auto& pt = data->bonsaiLeaves[rand() % data->bonsaiLeaves.size()];
+                const auto& pt = s.leaves[rand() % s.leaves.size()];
                 int idx = pt.y * cols + pt.x;
-                char cur = data->bonsaiGrid[idx].ch;
+                char cur = s.grid[idx].ch;
                 if (cur != ' ' && cur != '|' && cur != '/' && cur != '\\' && cur != '(' && cur != ')' && cur != '_') {
                     static const char FLUTTER_CHARS[] = { '&', '~', '*', '%', '@' };
-                    data->bonsaiGrid[idx].ch = FLUTTER_CHARS[rand() % 5];
+                    s.grid[idx].ch = FLUTTER_CHARS[rand() % 5];
                 }
             }
         }
 
         // Spawn falling petals strictly from actual foliage clusters on the tree
-        if (!data->bonsaiLeaves.empty() && (rand() % 3 == 0)) {
-            const auto& leaf = data->bonsaiLeaves[rand() % data->bonsaiLeaves.size()];
-            ScreenData::BonsaiPetal p;
+        if (!s.leaves.empty() && (rand() % 3 == 0)) {
+            const auto& leaf = s.leaves[rand() % s.leaves.size()];
+            BonsaiPetal p;
             p.x = (float)leaf.x;
             p.y = (float)leaf.y;
             p.vx = 0.20f + (float)(rand() % 25) / 100.0f;
@@ -318,32 +358,32 @@ void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT
             p.phase = (float)(rand() % 628) / 100.0f;
             static const char PETAL_CHARS[] = { '*', '.', '~', '+' };
             p.ch = PETAL_CHARS[rand() % 4];
-            p.color = data->bonsaiGrid[leaf.y * cols + leaf.x].color;
-            data->bonsaiPetals.push_back(p);
+            p.color = s.grid[leaf.y * cols + leaf.x].color;
+            s.petals.push_back(p);
         }
 
         // Serene viewing duration: 18 seconds before renewal
         if (elapsed > 18000) {
-            data->bonsaiState = 2; // Renewal
-            data->bonsaiStateStartTime = now;
+            s.state = 2; // Renewal
+            s.stateStartTime = now;
         }
-    } else if (data->bonsaiState == 2) {
+    } else if (s.state == 2) {
         // Renewal: gentle fade transition, then sprout a new tree
-        DWORD elapsed = now - data->bonsaiStateStartTime;
+        DWORD elapsed = now - s.stateStartTime;
         if (elapsed > 1800) {
-            StartNewBonsai(data, cols, rows);
+            StartNewBonsai(s, cols, rows);
         }
     }
 
     // Update Petals
-    for (size_t i = 0; i < data->bonsaiPetals.size(); ) {
-        auto& p = data->bonsaiPetals[i];
+    for (size_t i = 0; i < s.petals.size(); ) {
+        auto& p = s.petals[i];
         p.phase += dt * 2.0f;
         p.x += (p.vx + sinf(p.phase) * 0.4f) * (dt * 30.0f);
         p.y += p.vy * (dt * 30.0f);
 
         if (p.y >= (float)(rows - 2) || p.x >= (float)cols || p.x < 0) {
-            data->bonsaiPetals.erase(data->bonsaiPetals.begin() + i);
+            s.petals.erase(s.petals.begin() + i);
         } else {
             ++i;
         }
@@ -353,19 +393,19 @@ void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT
     for (int y = 0; y < rows; ++y) {
         int x = 0;
         while (x < cols) {
-            if (data->bonsaiGrid[y * cols + x].ch == ' ') {
+            if (s.grid[y * cols + x].ch == ' ') {
                 x++;
                 continue;
             }
 
             int startX = x;
-            COLORREF col = data->bonsaiGrid[y * cols + x].color;
+            COLORREF col = s.grid[y * cols + x].color;
             char span[512];
             int spanLen = 0;
 
-            while (x < cols && data->bonsaiGrid[y * cols + x].ch != ' ' &&
-                   data->bonsaiGrid[y * cols + x].color == col && spanLen < 500) {
-                span[spanLen++] = data->bonsaiGrid[y * cols + x].ch;
+            while (x < cols && s.grid[y * cols + x].ch != ' ' &&
+                   s.grid[y * cols + x].color == col && spanLen < 500) {
+                span[spanLen++] = s.grid[y * cols + x].ch;
                 x++;
             }
             span[spanLen] = '\0';
@@ -376,7 +416,7 @@ void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT
     }
 
     // Render drifting petals on top
-    for (const auto& p : data->bonsaiPetals) {
+    for (const auto& p : s.petals) {
         int px = (int)p.x;
         int py = (int)p.y;
         if (px >= 0 && px < cols && py >= 0 && py < rows) {
@@ -385,3 +425,13 @@ void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT
         }
     }
 }
+
+REGISTER_SCREENSAVER(
+    25,
+    L"cbonsai (Bonsai Tree)",
+    "cbonsai",
+    { "cbonsai", "bonsai", "tree" },
+    WRAP_LEGACY(RenderBonsai),
+    {}
+);
+

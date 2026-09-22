@@ -132,11 +132,7 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 		data->hFont = CreateFontA(g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 			FIXED_PITCH | FF_MODERN, "Consolas");
-		data->hMatrixFont = CreateFontW(g_TextSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
-			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-			FIXED_PITCH | FF_MODERN, L"MS Gothic");
 		data->startTime = GetTickCount64();
-		initPerlin(12345, data->perm);
 
 		RenderContext ctx;
 		ctx.hdc = memDC;
@@ -251,8 +247,6 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 
 		// 3. Cleanup ScreenData
 		if (data->hFont) DeleteObject(data->hFont);
-		if (data->hMatrixFont) DeleteObject(data->hMatrixFont);
-		if (data->nyanFont) DeleteObject(data->nyanFont);
 		delete data;
 
 		// Compute metrics

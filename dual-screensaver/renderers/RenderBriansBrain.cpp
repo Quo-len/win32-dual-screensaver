@@ -1,5 +1,6 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <algorithm>
 
 // States
@@ -88,3 +89,5 @@ void RenderBriansBrain(HDC memDC, ScreenData* data, int width, int height, const
     StretchDIBits(memDC, 0, 0, cols * BB_CELL, rows * BB_CELL,
         0, 0, cols, rows, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(18, L"Brian's Brain", "brain", { "brain", "brian" }, WRAP_LEGACY(RenderBriansBrain), {});

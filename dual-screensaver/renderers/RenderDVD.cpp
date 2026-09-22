@@ -1,8 +1,20 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
+#include "../settings/DvdSettings.h"
 #include <string.h>
+#include <cmath> // Added for fabsf, cosf, sinf
+
+struct DvdState {
+    float x = 0.0f;
+    float y = 0.0f;
+    float dx = 3.0f;
+    float dy = 2.5f;
+    int colorIndex = 0;
+};
 
 void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<DvdState>(7);
     const char* logoText = "DVD";
 
     int dvdFontSize = max(50, height / 6);
@@ -22,41 +34,48 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
 
     int visualHeight = tm.tmAscent - tm.tmInternalLeading;
 
-    if (data->logoX == 0 && data->logoY == 0) {
-        data->logoX = (float)(rand() % max(1, width - tw));
-        data->logoY = (float)(rand() % max(1, height - visualHeight));
+    if (state.x == 0 && state.y == 0) {
+        state.x = (float)(rand() % max(1, width - tw));
+        state.y = (float)(rand() % max(1, height - visualHeight));
         
-        float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
+        // Ensure angle is not perfectly horizontal or vertical 
+        int angleDegree = 0;
+        do {
+            angleDegree = rand() % 360;
+        } while (angleDegree % 90 == 0);
+
+        float angle = (float)angleDegree * 3.14159f / 180.0f;
         extern float g_DvdSpeed;
-        data->logoDX = cosf(angle) * g_DvdSpeed;
-        data->logoDY = sinf(angle) * g_DvdSpeed;
+        state.dx = cosf(angle) * g_DvdSpeed;
+        state.dy = sinf(angle) * g_DvdSpeed;
     }
 
-    data->logoX += data->logoDX;
-    data->logoY += data->logoDY;
+    state.x += state.dx;
+    state.y += state.dy;
 
     bool bounced = false;
 
-    if (data->logoX <= 0) {
-        data->logoX = 0; data->logoDX = abs(data->logoDX); bounced = true;
+    // Fixed: Replaced int abs() with float fabsf() to prevent precision truncation to 0
+    if (state.x <= 0) {
+        state.x = 0; state.dx = fabsf(state.dx); bounced = true;
     }
-    else if (data->logoX + tw >= width) {
-        data->logoX = (float)(width - tw); data->logoDX = -abs(data->logoDX); bounced = true;
+    else if (state.x + tw >= width) {
+        state.x = (float)(width - tw); state.dx = -fabsf(state.dx); bounced = true;
     }
 
-    if (data->logoY <= 0) {
-        data->logoY = 0;
-        data->logoDY = abs(data->logoDY);
+    if (state.y <= 0) {
+        state.y = 0;
+        state.dy = fabsf(state.dy);
         bounced = true;
     }
-    else if (data->logoY + visualHeight >= height) {
-        data->logoY = (float)(height - visualHeight);
-        data->logoDY = -abs(data->logoDY);
+    else if (state.y + visualHeight >= height) {
+        state.y = (float)(height - visualHeight);
+        state.dy = -fabsf(state.dy);
         bounced = true;
     }
 
     if (bounced) {
-        data->logoColorIndex = (data->logoColorIndex + 1) % 6;
+        state.colorIndex = (state.colorIndex + 1) % 6;
     }
 
     COLORREF colors[6] = {
@@ -65,10 +84,19 @@ void RenderDVD(HDC memDC, ScreenData* data, int width, int height, const RECT& r
     };
 
     SetBkMode(memDC, TRANSPARENT);
-    SetTextColor(memDC, colors[data->logoColorIndex]);
+    SetTextColor(memDC, colors[state.colorIndex]);
 
-    TextOutA(memDC, (int)data->logoX, (int)data->logoY - tm.tmInternalLeading, logoText, (int)strlen(logoText));
+    TextOutA(memDC, (int)state.x, (int)state.y - tm.tmInternalLeading, logoText, (int)strlen(logoText));
 
     SelectObject(memDC, hOldFont);
     DeleteObject(hDvdFont);
 }
+
+REGISTER_SCREENSAVER(
+    7,
+    L"Bouncing DVD Logo",
+    "dvd",
+    { "dvd" },
+    WRAP_LEGACY(RenderDVD),
+    GetDvdSettings()
+);

@@ -1,11 +1,12 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <stdio.h>
 #include <string.h>
 #include <string>
 
 void RenderBlank(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
-    DWORD elapsed = GetTickCount64() - data->startTime;
+    DWORD elapsed = (DWORD)(GetTickCount64() - data->startTime);
     int seconds = (elapsed / 1000) % 60;
     int minutes = (elapsed / 60000) % 60;
     int hours = (elapsed / 3600000);
@@ -46,3 +47,13 @@ void RenderBlank(HDC memDC, ScreenData* data, int width, int height, const RECT&
 
     DrawTextA(memDC, cow.c_str(), -1, &drawRect, DT_LEFT);
 }
+
+REGISTER_SCREENSAVER(
+    4,
+    L"Blank",
+    "blank",
+    { "blank", "none" },
+    WRAP_LEGACY(RenderBlank),
+    {}
+);
+

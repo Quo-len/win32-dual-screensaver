@@ -1,5 +1,6 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <algorithm>
 
 // Box-drawing chars: 0=empty 1=═ 2=║ 3=╔ 4=╗ 5=╚ 6=╝ 7=╬
@@ -34,15 +35,23 @@ static const COLORREF PALETTE[] = {
 };
 static const int PAL_SIZE = 8;
 
-static void spawnPipe(ScreenData* data, int cols, int rows) {
-    if ((int)data->pipeHeads.size() >= 7) return;
-    data->pipeHeads.push_back((rand() % rows) * cols + (rand() % cols));
-    data->pipeDirs.push_back(rand() % 4);
-    data->pipeColors.push_back(PALETTE[rand() % PAL_SIZE]);
+struct PipesState {
+    std::vector<int> pipeHeads;
+    std::vector<int> pipeDirs;
+    std::vector<COLORREF> pipeColors;
+};
+
+static void spawnPipe(PipesState& state, int cols, int rows) {
+    if ((int)state.pipeHeads.size() >= 7) return;
+    state.pipeHeads.push_back((rand() % rows) * cols + (rand() % cols));
+    state.pipeDirs.push_back(rand() % 4);
+    state.pipeColors.push_back(PALETTE[rand() % PAL_SIZE]);
 }
 
 void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
+
+    auto& state = data->GetCustomState<PipesState>(17);
 
     SelectObject(memDC, data->hFont);
     TEXTMETRICA tm;
@@ -61,11 +70,11 @@ void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT&
         data->rows = rows;
         data->grid.assign(cols * rows, 0);         // char type
         data->pixels.assign(cols * rows, 0);       // color (as COLORREF)
-        data->pipeHeads.clear();
-        data->pipeDirs.clear();
-        data->pipeColors.clear();
+        state.pipeHeads.clear();
+        state.pipeDirs.clear();
+        state.pipeColors.clear();
         int n = 2 + rand() % 3;
-        for (int i = 0; i < n; i++) spawnPipe(data, cols, rows);
+        for (int i = 0; i < n; i++) spawnPipe(state, cols, rows);
     }
 
     // Reset if too full (>= 70%)
@@ -74,21 +83,21 @@ void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT&
     if (filled >= cols * rows * 70 / 100) {
         data->grid.assign(cols * rows, 0);
         data->pixels.assign(cols * rows, 0);
-        data->pipeHeads.clear();
-        data->pipeDirs.clear();
-        data->pipeColors.clear();
+        state.pipeHeads.clear();
+        state.pipeDirs.clear();
+        state.pipeColors.clear();
         int n = 2 + rand() % 3;
-        for (int i = 0; i < n; i++) spawnPipe(data, cols, rows);
+        for (int i = 0; i < n; i++) spawnPipe(state, cols, rows);
     }
 
     // Advance each pipe head by 3 cells per frame
-    int numPipes = (int)data->pipeHeads.size();
+    int numPipes = (int)state.pipeHeads.size();
     for (int p = 0; p < numPipes; p++) {
         for (int step = 0; step < 3; step++) {
-            int idx = data->pipeHeads[p];
+            int idx = state.pipeHeads[p];
             int x   = idx % cols;
             int y   = idx / cols;
-            int dir = data->pipeDirs[p];
+            int dir = state.pipeDirs[p];
 
             bool isOccupied = (data->grid[idx] != 0);
 
@@ -102,16 +111,16 @@ void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT&
                 newDir = opts[rand() % 2];
                 // Overwrite current cell with the correct corner
                 data->grid[idx] = cornerType(dir, newDir);
-                data->pixels[idx] = (uint32_t)data->pipeColors[p];
+                data->pixels[idx] = (uint32_t)state.pipeColors[p];
             } else {
                 // Keep straight. If already occupied by a different pipe, turn it into an intersection (7)
                 if (isOccupied && data->grid[idx] != 7) {
                     data->grid[idx] = 7;
                     // We overwrite the color to the new pipe's color so it looks like it goes "over"
-                    data->pixels[idx] = (uint32_t)data->pipeColors[p];
+                    data->pixels[idx] = (uint32_t)state.pipeColors[p];
                 } else if (!isOccupied) {
                     data->grid[idx]   = (dir == 0 || dir == 2) ? 1 : 2; // ═ or ║
-                    data->pixels[idx] = (uint32_t)data->pipeColors[p];
+                    data->pixels[idx] = (uint32_t)state.pipeColors[p];
                 }
             }
 
@@ -124,18 +133,18 @@ void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT&
 
             // If out of bounds, teleport pipe to new random start
             if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) {
-                data->pipeHeads[p] = (rand() % rows) * cols + (rand() % cols);
-                data->pipeDirs[p]  = rand() % 4;
-                data->pipeColors[p] = PALETTE[rand() % PAL_SIZE];
+                state.pipeHeads[p] = (rand() % rows) * cols + (rand() % cols);
+                state.pipeDirs[p]  = rand() % 4;
+                state.pipeColors[p] = PALETTE[rand() % PAL_SIZE];
             } else {
-                data->pipeHeads[p] = ny * cols + nx;
-                data->pipeDirs[p]  = newDir;
+                state.pipeHeads[p] = ny * cols + nx;
+                state.pipeDirs[p]  = newDir;
             }
         }
     }
 
     // Occasionally spawn an extra pipe
-    if (rand() % 180 == 0) spawnPipe(data, cols, rows);
+    if (rand() % 180 == 0) spawnPipe(state, cols, rows);
 
     SetBkMode(memDC, TRANSPARENT);
 
@@ -163,3 +172,5 @@ void RenderPipes(HDC memDC, ScreenData* data, int width, int height, const RECT&
         }
     }
 }
+
+REGISTER_SCREENSAVER(17, L"Pipes", "pipes", { "pipes" }, WRAP_LEGACY(RenderPipes), {});

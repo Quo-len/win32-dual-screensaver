@@ -13,7 +13,8 @@
 //  • Re-randomises every 50 s with a fresh random parameter set
 
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -117,6 +118,22 @@ inline void HSV(float h, float s, float v, int& r, int& g, int& b)
     b = (int)(bv * 255.0f);
 }
 
+struct HarmoPendulum {
+    double amp;
+    double freq;
+    double phase;
+    double damp;
+};
+
+struct HarmonographState {
+    HarmoPendulum harmoP[3];
+    double harmoT = 0.0;
+    double harmoGlobalT = 0.0;
+    double harmoColorT = 0.0;
+    DWORD harmoLastTick = 0;
+    bool harmoInitialized = false;
+};
+
 // Integer and half-integer bases → proper closed Lissajous / rose patterns
 static const double kBases[] = {
     1.0, 2.0, 3.0, 4.0, 5.0,          // integers
@@ -125,19 +142,19 @@ static const double kBases[] = {
 };
 static const int kNBases = (int)(sizeof(kBases) / sizeof(kBases[0]));
 
-void InitHarmo(ScreenData* data)
+void InitHarmo(HarmonographState& state)
 {
     for (int i = 0; i < 3; i++) {
         double base  = kBases[rand() % kNBases];
         // Tiny irrational nudge: figure slowly precesses instead of closing
         double drift = ((rand() % 401) - 200) * 0.000035;
-        data->harmoP[i].freq  = base + drift;
-        data->harmoP[i].amp   = 0.40 + (rand() % 20) * 0.01;   // 0.40..0.59
-        data->harmoP[i].phase = (rand() % 6284) * 0.001;
-        data->harmoP[i].damp  = 0.0;
+        state.harmoP[i].freq  = base + drift;
+        state.harmoP[i].amp   = 0.40 + (rand() % 20) * 0.01;   // 0.40..0.59
+        state.harmoP[i].phase = (rand() % 6284) * 0.001;
+        state.harmoP[i].damp  = 0.0;
     }
-    data->harmoT           = 0.0;
-    data->harmoInitialized = true;
+    state.harmoT           = 0.0;
+    state.harmoInitialized = true;
 }
 
 } // namespace
@@ -147,16 +164,18 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
 {
     if (width <= 0 || height <= 0) return;
 
+    auto& state = data->GetCustomState<HarmonographState>(22);
+
     if (data->cols != width || data->rows != height || data->pixels.empty()) {
         data->cols = width;
         data->rows = height;
         data->pixels.assign((size_t)width * height, 0xFF000000u);
-        data->harmoLastTick  = GetTickCount();
-        data->harmoGlobalT   = 0.0;
-        data->harmoColorT    = 0.0;
-        InitHarmo(data);
+        state.harmoLastTick  = GetTickCount();
+        state.harmoGlobalT   = 0.0;
+        state.harmoColorT    = 0.0;
+        InitHarmo(state);
     }
-    if (!data->harmoInitialized) InitHarmo(data);
+    if (!state.harmoInitialized) InitHarmo(state);
 
     uint32_t* px    = data->pixels.data();
     int        total = width * height;
@@ -179,23 +198,23 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
     // Delta time
     // -------------------------------------------------------------------
     DWORD  now  = GetTickCount();
-    double dtMs = (double)(int)(now - data->harmoLastTick);
-    data->harmoLastTick = now;
+    double dtMs = (double)(int)(now - state.harmoLastTick);
+    state.harmoLastTick = now;
     if (dtMs < 0.0)   dtMs = 0.0;
     if (dtMs > 100.0) dtMs = 100.0;
     double dt = dtMs * 0.001;
 
-    data->harmoGlobalT += dt;
-    data->harmoColorT  += dt * 0.02;   // very slow global hue drift
+    state.harmoGlobalT += dt;
+    state.harmoColorT  += dt * 0.02;   // very slow global hue drift
 
     // -------------------------------------------------------------------
     // Periodic reset — new random figure
     // -------------------------------------------------------------------
-    if (data->harmoGlobalT >= 50.0) {
-        data->harmoGlobalT = 0.0;
-        data->harmoT       = 0.0;
+    if (state.harmoGlobalT >= 50.0) {
+        state.harmoGlobalT = 0.0;
+        state.harmoT       = 0.0;
         data->pixels.assign((size_t)width * height, 0xFF000000u);
-        InitHarmo(data);
+        InitHarmo(state);
         px = data->pixels.data();
     }
 
@@ -214,19 +233,19 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
     double cxd   = (double)width  * 0.5;
     double cyd   = (double)height * 0.5;
 
-    auto& P = data->harmoP;
+    auto& P = state.harmoP;
 
     // Subtle amplitude breathe — organic pulsing
-    double breathe = 1.0 + 0.10 * sin(data->harmoGlobalT * 0.5);
+    double breathe = 1.0 + 0.10 * sin(state.harmoGlobalT * 0.5);
 
-    double t = data->harmoT;
+    double t = state.harmoT;
 
     for (int strand = 0; strand < kStrands; strand++) {
         double phaseOff = strand * (M_PI * 0.5);   // 0, π/2, π, 3π/2
 
         // Hue: each strand is 90° apart on the colour wheel,
         // plus a slow global drift so the palette slowly rotates
-        float hue0 = (float)data->harmoColorT + (float)strand * 0.25f;
+        float hue0 = (float)state.harmoColorT + (float)strand * 0.25f;
 
         // Track previous point for line drawing
         {
@@ -275,7 +294,7 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
 
     // Advance the global t pointer by one full advance step
     t += kAdvance;
-    data->harmoT = t;
+    state.harmoT = t;
 
     // -------------------------------------------------------------------
     // Blit to screen
@@ -292,3 +311,5 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
                   0, 0, width, height,
                   px, &bmi, DIB_RGB_COLORS, SRCCOPY);
 }
+
+REGISTER_SCREENSAVER(22, L"Harmonograph", "harmonograph", { "harmonograph", "harmo" }, WRAP_LEGACY(RenderHarmonograph), {});

@@ -1,11 +1,19 @@
 #include "framework.h"
-#include "Renderers.h"
+#include "ScreensaverRegistry.h"
+#include "ScreenData.h"
 #include "Settings.h"
+#include "../settings/EarthSettings.h"
 #include <math.h>
 #include <vector>
 #include <string>
 
+struct EarthState {
+    float angle = 0.0f;
+};
+
 void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    auto& state = data->GetCustomState<EarthState>(3);
+
     SelectObject(memDC, data->hFont);
     TEXTMETRICA tm;
     GetTextMetricsA(memDC, &tm);
@@ -69,7 +77,7 @@ void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT&
             if (d2 <= 1.0f) {
                 float nz = sqrt(1.0f - d2);
                 float lat = asin(ny);
-                float lon = atan2(nx, nz) + data->A;
+                float lon = atan2(nx, nz) + state.angle;
 
                 float u = (lon + 3.14159f) / (2.0f * 3.14159f);
                 float v = (lat + 3.14159f / 2.0f) / 3.14159f;
@@ -102,5 +110,14 @@ void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT&
     textRect.top = (textRect.bottom - textHeight) / 2;
     DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
 
-    data->A += g_EarthSpeed;
+    state.angle += g_EarthSpeed;
 }
+
+REGISTER_SCREENSAVER(
+    3,
+    L"Earth",
+    "earth",
+    { "earth" },
+    WRAP_LEGACY(RenderEarth),
+    GetEarthSettings()
+);
