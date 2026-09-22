@@ -1,5 +1,7 @@
 # ASCII Video Converter & Bad Apple Screensaver Pipeline
 
+> 🧭 **Navigation**: [← Back to Main Project README](../README.md)
+
 This directory contains reusable tools to convert any MP4 / MKV / AVI / WebM video into an ultra-fast, compressed binary stream (`.bin`) designed for the **Dual-Screensaver ASCII Video Player** mode.
 
 ---

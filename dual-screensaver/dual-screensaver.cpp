@@ -26,6 +26,7 @@ WCHAR szTitle[MAX_LOADSTRING] = L"DualSaver";
 WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
 
 bool g_ShowDebugHUD = false;
+bool g_Force4K = false;
 
 const WCHAR* g_modeNames[] = {
 	L"Donut", L"Game of Life", L"Matrix", L"Earth",
@@ -33,7 +34,7 @@ const WCHAR* g_modeNames[] = {
 	L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
 	L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
 	L"Langton's Ant Symmetrical",
-	L"Boids Flocking", L"Cyclic CA", L"Pipes", L"Brian's Brain",
+	L"Pipes", L"Brian's Brain",
 	L"Mandelbrot Zoom", L"Clifford Attractor", L"Curl Noise Particles",
 	L"Harmonograph", L"Bad Apple (ASCII)", L"ASCIIQuarium",
 	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)"
@@ -45,7 +46,7 @@ const RenderFn g_renderers[] = {
 	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
 	RenderPerlin, RenderFire, RenderMemoryDump,
 	RenderRandomSort, RenderLangton,
-	RenderBoids, RenderCyclicCA, RenderPipes, RenderBriansBrain,
+	RenderPipes, RenderBriansBrain,
 	RenderMandelbrot, RenderClifford, RenderCurlNoise,
 	RenderHarmonograph, RenderBadApple, RenderASCIIQuarium,
 	RenderBonsai, RenderNyanCat
@@ -70,11 +71,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	if (wcsstr(lpCmdLine, L"/benchmark") || wcsstr(lpCmdLine, L"--benchmark") || wcsstr(lpCmdLine, L"/bench") || wcsstr(lpCmdLine, L"-bench"))
 	{
-		return RunBenchmark();
+		int width = 1920;
+		int height = 1080;
+		if (wcsstr(lpCmdLine, L"4k") || wcsstr(lpCmdLine, L"4K") || wcsstr(lpCmdLine, L"2160") || wcsstr(lpCmdLine, L"3840"))
+		{
+			width = 3840;
+			height = 2160;
+		}
+		else if (wcsstr(lpCmdLine, L"720") || wcsstr(lpCmdLine, L"720p"))
+		{
+			width = 1280;
+			height = 720;
+		}
+		bool visual = (wcsstr(lpCmdLine, L"visual") != NULL || wcsstr(lpCmdLine, L"show") != NULL || wcsstr(lpCmdLine, L"gui") != NULL || wcsstr(lpCmdLine, L"window") != NULL);
+		return RunBenchmark(width, height, 25, 75, visual);
 	}
 	if (wcsstr(lpCmdLine, L"/debug") || wcsstr(lpCmdLine, L"--debug") || wcsstr(lpCmdLine, L"-debug"))
 	{
 		g_ShowDebugHUD = true;
+	}
+	if (wcsstr(lpCmdLine, L"/4k") || wcsstr(lpCmdLine, L"--4k") || wcsstr(lpCmdLine, L"-4k") || wcsstr(lpCmdLine, L" 4k"))
+	{
+		g_Force4K = true;
 	}
 
 	const struct { const wchar_t* name; int idx; } modeMap[] = {
@@ -82,13 +100,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
 		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
 		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15},
-		{L"ant", 16}, {L"boids", 17}, {L"cyclic", 18}, {L"pipes", 19},
-		{L"brain", 20}, {L"mandelbrot", 21}, {L"clifford", 22}, {L"curl", 23},
-		{L"harmonograph", 24}, {L"harmo", 24},
-		{L"badapple", 25}, {L"bad-apple", 25}, {L"apple", 25}, {L"ascii", 25},
-		{L"asciiquarium", 26}, {L"aquarium", 26}, {L"fish", 26},
-		{L"cbonsai", 27}, {L"bonsai", 27}, {L"tree", 27},
-		{L"nyancat", 28}, {L"nyan", 28}, {L"cat", 28}
+		{L"ant", 16},
+		{L"pipes", 17}, {L"brain", 18}, {L"mandelbrot", 19}, {L"clifford", 20}, {L"curl", 21},
+		{L"harmonograph", 22}, {L"harmo", 22},
+		{L"badapple", 23}, {L"bad-apple", 23}, {L"apple", 23}, {L"ascii", 23},
+		{L"asciiquarium", 24}, {L"aquarium", 24}, {L"fish", 24},
+		{L"cbonsai", 25}, {L"bonsai", 25}, {L"tree", 25},
+		{L"nyancat", 26}, {L"nyan", 26}, {L"cat", 26}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
@@ -195,6 +213,15 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 	hInst = hInstance;
+	if (g_Force4K)
+	{
+		CreateWindowExW(WS_EX_TOPMOST, szWindowClass, szTitle,
+			WS_POPUP | WS_VISIBLE,
+			0, 0, 3840, 2160,
+			nullptr, nullptr, hInst, (LPVOID)(UINT_PTR)1);
+		ShowCursor(FALSE);
+		return TRUE;
+	}
 	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
 	return TRUE;
 }

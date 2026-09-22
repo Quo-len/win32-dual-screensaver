@@ -125,12 +125,9 @@ struct ScreenData {
 
     std::vector<AntState> ants;
     std::vector<unsigned char> antGrid;
-    std::vector<unsigned char> cyclicNext;  
     int antCols = 0;
     int antRows = 0;
     unsigned int currentAntColor;
-
-    std::vector<float> boidVX, boidVY;
 
     std::vector<int>      pipeHeads;
     std::vector<int>      pipeDirs;

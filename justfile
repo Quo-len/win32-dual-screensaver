@@ -24,22 +24,42 @@ debug:
     @Write-Host "==> Building Debug (x64)..." -ForegroundColor Cyan
     & "{{msbuild}}" {{solution}} /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo
 
-# Run headless performance benchmark & GDI leak tests
-bench: build
+# Run headless performance benchmark & GDI leak tests (default: 1080p, or specify '4k')
+bench res="": build
     @Write-Host "`n==> Running Headless Benchmark Suite..." -ForegroundColor Yellow
-    Start-Process -FilePath "{{bin}}" -ArgumentList "--benchmark" -Wait -NoNewWindow
+    Start-Process -FilePath "{{bin}}" -ArgumentList ("--benchmark " + "{{res}}").Trim() -Wait -NoNewWindow
+    @Get-Content benchmark_report.txt
+
+# Run 4K benchmark (3840x2160)
+bench-4k: (bench "4k")
+
+# Run on-screen visual benchmark showcase (e.g. 'just bench-visual' or 'just bench-visual 4k')
+bench-visual res="": build
+    @Write-Host "`n==> Launching Visual Benchmark Showcase..." -ForegroundColor Yellow
+    Start-Process -FilePath "{{bin}}" -ArgumentList ("--benchmark visual " + "{{res}}").Trim() -Wait -NoNewWindow
     @Get-Content benchmark_report.txt
 
 # Alias for bench
-test: bench
+test res="": (bench res)
 
 # Launch screensaver configuration dialog (/c)
 config: build
     & "{{bin}}" /c
 
-# Launch screensaver in fullscreen test mode (/s)
-run: build
-    & "{{bin}}" /s
+# Launch screensaver in fullscreen (/s) or custom resolution/mode (e.g. 'just run', 'just run 4k', 'just run matrix')
+run *args: build
+    & "{{bin}}" $(if ("{{args}}" -eq "4k") { "/s /4k" } elseif ("{{args}}" -ne "") { "{{args}}" } else { "/s" })
+
+# Launch screensaver in 4K resolution
+run-4k: (run "4k")
+
+# List all available animation modes for 'just run <mode>'
+modes:
+    @Write-Host "`nAvailable screensaver modes for 'just run <mode>':" -ForegroundColor Cyan
+    @Write-Host "  Simulations     : " -NoNewline -ForegroundColor Yellow; Write-Host "matrix, gol, ant, brain, perlin, fire"
+    @Write-Host "  Geometry & Math : " -NoNewline -ForegroundColor Yellow; Write-Host "donut, julia, mandelbrot, clifford, curl, harmonograph (harmo), grid, pipes"
+    @Write-Host "  Retro & Visuals : " -NoNewline -ForegroundColor Yellow; Write-Host "nyancat (nyan), asciiquarium (aquarium/fish), cbonsai (tree/bonsai), badapple (apple), stars, dvd, pong, maze, sort, memory, clock, earth, blank`n"
+
 
 # Clean build output and intermediate folders
 clean:

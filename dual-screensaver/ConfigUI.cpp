@@ -6,7 +6,7 @@
 
 extern HINSTANCE hInst;
 
-#define NUM_SCREENSAVERS 29  
+#define NUM_SCREENSAVERS 27  
 
 #define IDAPPLY_MAIN 2200
 #define IDAPPLY_SUB 2300
@@ -23,7 +23,7 @@ bool HasSettings(int id) {
 	case 11: return true; // Clock
 	case 12: return true; // Perlin
 	case 16: return true; // Langton's Ant
-	case 23: return true; // Curl Noise Particles
+	case 21: return true; // Curl Noise Particles
 	default: return false;
 	}
 }
@@ -92,7 +92,7 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			sprintf_s(buf, "%d", g_AntCount); createRow(L"Sets (Sym):", IDC_EDIT_ANT_COUNT, buf);
 			sprintf_s(buf, "%d", g_AntSpeed); createRow(L"Speed:", IDC_EDIT_ANT_SPEED, buf);
 			break;
-		case 23:
+		case 21:
 			sprintf_s(buf, "%d", g_CurlCount); createRow(L"Particles:", IDC_EDIT_CURL_COUNT, buf);
 			break;
 		}
@@ -147,7 +147,7 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				if (g_AntCount < 1) g_AntCount = 1;
 				if (g_AntSpeed < 1) g_AntSpeed = 1;
 				break;
-			case 23:
+			case 21:
 				getInt(IDC_EDIT_CURL_COUNT, g_CurlCount);
 				if (g_CurlCount < 100) g_CurlCount = 100;
 				if (g_CurlCount > 500000) g_CurlCount = 500000;
@@ -194,7 +194,7 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				g_AntCount = DEFAULT_ANT_COUNT; sprintf_s(buf, "%d", g_AntCount); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_COUNT, buf);
 				g_AntSpeed = DEFAULT_ANT_SPEED; sprintf_s(buf, "%d", g_AntSpeed); SetDlgItemTextA(hWnd, IDC_EDIT_ANT_SPEED, buf);
 				break;
-			case 23:
+			case 21:
 				g_CurlCount = DEFAULT_CURL_COUNT; sprintf_s(buf, "%d", g_CurlCount); SetDlgItemTextA(hWnd, IDC_EDIT_CURL_COUNT, buf);
 				break;
 			}

@@ -28,7 +28,23 @@ struct BenchResult {
 	std::string status;
 };
 
-int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
+static bool s_abortVisual = false;
+
+static LRESULT CALLBACK BenchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	if (msg == WM_KEYDOWN && wParam == VK_ESCAPE) {
+		s_abortVisual = true;
+		DestroyWindow(hWnd);
+		return 0;
+	}
+	if (msg == WM_CLOSE || msg == WM_DESTROY) {
+		s_abortVisual = true;
+		return 0;
+	}
+	return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool visual)
 {
 	AllocConsole();
 	FILE* fDummy;
@@ -53,13 +69,42 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 	std::stringstream header;
 	header << "\n"
 	       << "==========================================================================================================\n"
-	       << "                             DUAL SCREENSAVER HEADLESS PERFORMANCE BENCHMARK                              \n"
+	       << "                         DUAL SCREENSAVER " << (visual ? "VISUAL SHOWCASE &" : "HEADLESS") << " BENCHMARK\n"
 	       << "                Resolution: " << width << "x" << height 
 	       << " | Frames: " << benchFrames << " (" << warmupFrames << " warmup) | Engine: Win32 GDI (0% GPU)\n"
 	       << "==========================================================================================================\n"
 	       << " #   Renderer Name                 Avg (ms)   P95 (ms)   Max FPS   CPU %     RAM (MB)   GDI Leaks  Status     \n"
 	       << "----------------------------------------------------------------------------------------------------------\n";
 	logBoth(header.str());
+
+	HWND benchWnd = NULL;
+	HDC winHdc = NULL;
+	s_abortVisual = false;
+
+	if (visual) {
+		WNDCLASSEXW wc = { sizeof(wc) };
+		wc.lpfnWndProc = BenchWndProc;
+		wc.hInstance = GetModuleHandle(NULL);
+		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wc.lpszClassName = L"DualSaverVisualBench";
+		RegisterClassExW(&wc);
+
+		int screenW = GetSystemMetrics(SM_CXSCREEN);
+		int screenH = GetSystemMetrics(SM_CYSCREEN);
+		int dispW = (width <= screenW) ? width : screenW;
+		int dispH = (height <= screenH) ? height : screenH;
+
+		benchWnd = CreateWindowExW(WS_EX_APPWINDOW, L"DualSaverVisualBench",
+			L"Dual Screensaver - Visual Benchmark Showcase (Press ESC to Exit)",
+			WS_POPUP | WS_VISIBLE,
+			(screenW - dispW) / 2, (screenH - dispH) / 2, dispW, dispH,
+			NULL, NULL, GetModuleHandle(NULL), NULL);
+		if (benchWnd) {
+			winHdc = GetDC(benchWnd);
+			ShowWindow(benchWnd, SW_SHOW);
+			UpdateWindow(benchWnd);
+		}
+	}
 
 	HDC screenDC = GetDC(NULL);
 	HDC memDC = CreateCompatibleDC(screenDC);
@@ -78,6 +123,7 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 
 	for (int mode = 0; mode < g_numScreensavers; ++mode)
 	{
+		if (s_abortVisual) break;
 		DWORD gdiInitial = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
 
 		ScreenData* data = new ScreenData();
@@ -94,7 +140,16 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 
 		// 1. Warmup iterations (settles simulation and initial GDI subsystem cache)
 		for (int w = 0; w < warmupFrames; ++w) {
+			if (s_abortVisual) break;
 			g_renderers[mode](memDC, data, width, height, rect);
+			if (visual && winHdc) {
+				BitBlt(winHdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+				MSG msg;
+				while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			}
 		}
 
 		// 2. Timed benchmark iterations
@@ -111,6 +166,7 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 		GetProcessTimes(GetCurrentProcess(), &ftCreate, &ftExit, &k0, &u0);
 
 		for (int f = 0; f < benchFrames; ++f) {
+			if (s_abortVisual) break;
 			if (f == halfFrames) {
 				gdiMidPoint = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
 			}
@@ -125,6 +181,25 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 			totalMs += ms;
 			if (ms < minMs) minMs = ms;
 			if (ms > maxMs) maxMs = ms;
+
+			if (visual && winHdc) {
+				char hudBuf[128];
+				sprintf_s(hudBuf, " [%02d/%02d] %ls | Frame: %.2f ms | ESC to exit ", mode, g_numScreensavers - 1, g_modeNames[mode], ms);
+				RECT card = { 20, 20, 460, 52 };
+				HBRUSH bg = CreateSolidBrush(RGB(15, 22, 32));
+				FillRect(memDC, &card, bg);
+				DeleteObject(bg);
+				SetBkMode(memDC, TRANSPARENT);
+				SetTextColor(memDC, RGB(100, 230, 140));
+				DrawTextA(memDC, hudBuf, -1, &card, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
+
+				BitBlt(winHdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+				MSG msg;
+				while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			}
 		}
 
 		GetProcessTimes(GetCurrentProcess(), &ftCreate, &ftExit, &k1, &u1);
@@ -218,6 +293,11 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames)
 	DeleteObject(memBmp);
 	DeleteDC(memDC);
 	ReleaseDC(NULL, screenDC);
+
+	if (benchWnd) {
+		if (winHdc) ReleaseDC(benchWnd, winHdc);
+		DestroyWindow(benchWnd);
+	}
 
 	// Summary
 	std::stringstream summary;

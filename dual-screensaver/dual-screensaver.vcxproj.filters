@@ -122,12 +122,6 @@
     <ClCompile Include="renderers\RenderLangton.cpp">
       <Filter>Source Files\renderers</Filter>
     </ClCompile>
-    <ClCompile Include="renderers\RenderBoids.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderCyclicCA.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
     <ClCompile Include="renderers\RenderPipes.cpp">
       <Filter>Source Files\renderers</Filter>
     </ClCompile>

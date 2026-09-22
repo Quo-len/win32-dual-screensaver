@@ -185,8 +185,6 @@
     <ClCompile Include="renderers\RenderPong.cpp" />
     <ClCompile Include="renderers\RenderRandomSort.cpp" />
     <ClCompile Include="renderers\RenderStars.cpp" />
-    <ClCompile Include="renderers\RenderBoids.cpp" />
-    <ClCompile Include="renderers\RenderCyclicCA.cpp" />
     <ClCompile Include="renderers\RenderPipes.cpp" />
     <ClCompile Include="renderers\RenderBriansBrain.cpp" />
     <ClCompile Include="renderers\RenderMandelbrot.cpp" />

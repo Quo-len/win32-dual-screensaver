@@ -1,6 +1,8 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 25 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 multi-monitor screensaver for Windows with 29 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+
+> 📚 **Navigation**: [Features](#features) • [Visual Modes](#visual-modes-29-built-in) • [Installation](#installation-windows-built-in-screensaver) • [CLI & Hotkeys](#command-line-flags--controls) • [🎬 Video Converter Guide](scripts/README.md)
 
 ---
 
@@ -35,18 +37,16 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 25 p
 | 14  | **Hex Memory Dump**      | Cyberpunk-style animated memory buffer scanner                             |
 | 15  | **Sorting Algorithms**   | Real-time step-by-step visualizations of classic sorting routines          |
 | 16  | **Langton's Ant**        | Multi-agent symmetrical cellular automata creating intricate tapestries    |
-| 17  | **Boids Flocking**       | 150 agents following separation, alignment & cohesion rules with trails    |
-| 18  | **Cyclic CA**            | 16-state cyclic cellular automaton producing perpetual spinning spirals    |
-| 19  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors  |
-| 20  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black       |
-| 21  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette          |
-| 22  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing |
-| 23  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails    |
-| 24  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow |
-| 25  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression          |
-| 26  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp   |
-| 27  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
-| 28  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
+| 17  | **Pipes**                | Classic pipes screensaver with Unicode box-drawing chars and vivid colors  |
+| 18  | **Brian's Brain**        | 3-state CA with gliders that never stabilise — white sparks on black       |
+| 19  | **Mandelbrot Zoom**      | Infinite zoom into 8 curated targets with smooth coloring palette          |
+| 20  | **Clifford Attractor**   | 2D strange attractor orbit density field with dynamic coefficient morphing |
+| 21  | **Curl Noise Particles** | Incompressible fluid-like particle flow field with smooth fading trails    |
+| 22  | **Harmonograph**         | Triple-pendulum rotary harmonograph with interlaced strands and bloom glow |
+| 23  | **Bad Apple (ASCII)**    | High-framerate looped ASCII art video player with RLE compression          |
+| 24  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp   |
+| 25  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
+| 26  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
 
 ---
 
@@ -63,11 +63,18 @@ Download `DualScreenSaver.scr` directly from the [GitHub Releases](https://githu
 You can build using Visual Studio (**Ctrl + Shift + B**), or use [`just`](https://github.com/casey/just) for quick developer tasks:
 
 ```powershell
-just build     # Build Release (x64) and create DualScreenSaver.scr
-just bench     # Run automated performance & GDI leak benchmark
-just config    # Launch configuration settings dialog (/c)
-just run       # Launch screensaver in fullscreen (/s)
-just clean     # Clean intermediate build files
+just build               # Build Release (x64) and create DualScreenSaver.scr
+just debug               # Build Debug (x64)
+just run                 # Launch screensaver in fullscreen (/s)
+just run 4k              # Launch screensaver in 4K resolution (/s /4k)
+just run <mode>          # Launch specific mode (e.g., just run matrix)
+just modes               # List all available animation modes
+just bench               # Run headless benchmark at 1080p
+just bench 4k            # Run headless benchmark in 4K (3840x2160)
+just bench-visual        # Run visual on-screen showcase benchmark (1080p)
+just bench-visual 4k     # Run visual on-screen showcase benchmark in 4K
+just config              # Launch configuration settings dialog (/c)
+just clean               # Clean intermediate build files
 ```
 
 Or via MSBuild directly:
@@ -142,22 +149,24 @@ Settings are managed via a dedicated graphical window and saved to the registry:
 
 The screensaver executable supports standard Windows screensaver flags as well as custom switches:
 
-| Flag              | Purpose                                                          | Example                            |
-| ----------------- | ---------------------------------------------------------------- | ---------------------------------- |
-| `/s`              | Runs fullscreen screensaver on all monitors (default behavior)   | `DualScreenSaver.exe /s`           |
-| `/c`              | Opens the graphical Settings configuration dialog                | `DualScreenSaver.exe /c`           |
-| `/pool`           | Opens the Randomizer Pool checklist dialog directly              | `DualScreenSaver.exe /pool`        |
-| `/p <HWND>`       | Renders preview inside parent window handle                      | `DualScreenSaver.exe /p 123456`    |
-| `/debug`          | Launches with live Performance HUD overlay enabled by default    | `DualScreenSaver.exe /debug`       |
-| `--benchmark`     | Runs headless performance benchmark & GDI leak test on all modes | `DualScreenSaver.exe --benchmark`  |
-| `<mode1> [mode2]` | Launch immediately with specific modes by name                   | `DualScreenSaver.exe matrix earth` |
+| Flag                        | Purpose                                                            | Example                                     |
+| --------------------------- | ------------------------------------------------------------------ | ------------------------------------------- |
+| `/s`                        | Runs fullscreen screensaver on all monitors (default behavior)     | `DualScreenSaver.exe /s`                    |
+| `/4k`                       | Renders screensaver in full 4K (3840x2160) canvas                  | `DualScreenSaver.exe /s /4k`                |
+| `/c`                        | Opens the graphical Settings configuration dialog                  | `DualScreenSaver.exe /c`                    |
+| `/pool`                     | Opens the Randomizer Pool checklist dialog directly                | `DualScreenSaver.exe /pool`                 |
+| `/p <HWND>`                 | Renders preview inside parent window handle                        | `DualScreenSaver.exe /p 123456`             |
+| `/debug`                    | Launches with live Performance HUD overlay enabled by default      | `DualScreenSaver.exe /debug`                |
+| `--benchmark [4k]`          | Runs headless benchmark & GDI leak test on all modes (1080p or 4K)  | `DualScreenSaver.exe --benchmark 4k`        |
+| `--benchmark visual [4k]`   | Runs on-screen visual benchmark showcase (1080p or 4K)             | `DualScreenSaver.exe --benchmark visual 4k` |
+| `<mode1> [mode2]`           | Launch immediately with specific modes by name                     | `DualScreenSaver.exe matrix earth`          |
 
 > [!TIP]
 > **Live Diagnostics HUD**: Press **`F5`** at any time while the screensaver is running to toggle the real-time Performance HUD (frame time latency in ms, FPS capacity, GDI handle count, and memory usage).
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `boids`, `cyclic`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`.
 
 ---
 
@@ -173,4 +182,11 @@ The screensaver executable supports standard Windows screensaver flags as well a
 1. Open `dual-screensaver.slnx` (or `dual-screensaver.vcxproj`) in Visual Studio.
 2. Select **Configuration** (`Release` or `Debug`) and **Platform** (`x64`).
 3. Press **Ctrl + Shift + B** to build.
-4. Output binaries will be located under `x64\Release\` (or `x64\Debug\`).
+4. Output binaries will be located under `dual-screensaver\x64\Release\` (or `Debug\`).
+
+---
+
+## Documentation & Related Guides
+
+- 📖 **[Main Project Guide](README.md)** — Core setup, installation, CLI flags, and build instructions.
+- 🎬 **[ASCII Video Converter Pipeline](scripts/README.md)** — Step-by-step guide to convert any video into an ASCII screensaver binary stream (`.bin`).
