@@ -244,7 +244,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 				x, y, chkW, 26, hWnd, (HMENU)(INT_PTR)(IDC_POOL_CHECK_BASE + i), hInst, NULL);
 			SendMessage(hChk, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-			if (g_RandomPool & (1u << i))
+			if (g_RandomPool & (1ULL << i))
 				SendMessage(hChk, BM_SETCHECK, BST_CHECKED, 0);
 
 			if (HasSettings(i)) {
@@ -337,12 +337,12 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		}
 		else if (id == IDAPPLY_MAIN)
 		{
-			unsigned int newMask = 0;
+			uint64_t newMask = 0;
 			for (int i = 0; i < NUM_SCREENSAVERS; i++)
 			{
 				if (IsDlgButtonChecked(hWnd, IDC_POOL_CHECK_BASE + i) == BST_CHECKED)
 				{
-					newMask |= (1u << i);
+					newMask |= (1ULL << i);
 				}
 			}
 			g_RandomPool = newMask;

@@ -6,8 +6,9 @@
 struct ScreenData;
 using RenderFn = void(*)(HDC, ScreenData*, int, int, const RECT&);
 
+#include "ScreensaverRegistry.h"
+
 extern const WCHAR* g_modeNames[];
-extern const RenderFn g_renderers[];
 extern const int g_numScreensavers;
 
 extern int g_TextSize;

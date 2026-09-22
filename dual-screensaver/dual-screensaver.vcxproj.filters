@@ -48,6 +48,9 @@
     <ClInclude Include="Renderers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ScreensaverRegistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Defaults.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -71,88 +74,10 @@
     <ClCompile Include="ConfigUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="renderers\RenderDonut.cpp">
-      <Filter>Source Files\renderers</Filter>
+    <ClCompile Include="ScreensaverRegistry.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="renderers\RenderGoL.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderMatrix.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderEarth.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderFire.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderBlank.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderJulia.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderStars.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderDVD.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderGrid.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderPong.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderMaze.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderClock.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderPerlin.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderMemoryDump.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderRandomSort.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderLangton.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderPipes.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderBriansBrain.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderMandelbrot.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderClifford.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderCurlNoise.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderHarmonograph.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderBadApple.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderASCIIQuarium.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderBonsai.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderNyanCat.cpp">
-      <Filter>Source Files\renderers</Filter>
-    </ClCompile>
-    <ClCompile Include="renderers\RenderSnake.cpp">
+    <ClCompile Include="renderers\*.cpp">
       <Filter>Source Files\renderers</Filter>
     </ClCompile>
   </ItemGroup>

@@ -21,7 +21,7 @@ float g_DvdSpeed = DEFAULT_DVDSPEED;
 int g_ModePrimary = DEFAULT_MODEPRIMARY;
 int g_ModeSecondary = DEFAULT_MODESECONDARY;
 int g_RandomMode = DEFAULT_RANDOMMODE;
-unsigned int g_RandomPool = DEFAULT_RANDOM_POOL;
+uint64_t g_RandomPool = DEFAULT_RANDOM_POOL;
 
 const WCHAR* REG_PATH = L"Software\\DualSaver";
 
@@ -70,8 +70,16 @@ void LoadSettings()
 		RegQueryValueExW(hKey, L"AntSpeed", NULL, NULL, (LPBYTE)&g_AntSpeed, &size);
 		size = sizeof(int);
 		RegQueryValueExW(hKey, L"CurlCount", NULL, NULL, (LPBYTE)&g_CurlCount, &size);
-		size = sizeof(unsigned int);
-		if (RegQueryValueExW(hKey, L"RandomPool", NULL, NULL, (LPBYTE)&g_RandomPool, &size) != ERROR_SUCCESS) {
+		DWORD type = 0;
+		size = sizeof(uint64_t);
+		uint64_t val64 = 0;
+		if (RegQueryValueExW(hKey, L"RandomPool", NULL, &type, (LPBYTE)&val64, &size) == ERROR_SUCCESS) {
+			if (type == REG_DWORD) {
+				g_RandomPool = *(DWORD*)&val64;
+			} else {
+				g_RandomPool = val64;
+			}
+		} else {
 			g_RandomPool = DEFAULT_RANDOM_POOL;
 		}
 		RegCloseKey(hKey);
@@ -103,7 +111,7 @@ void SaveSettings()
 		RegSetValueExW(hKey, L"AntCount", 0, REG_DWORD, (const BYTE*)&g_AntCount, sizeof(int));
 		RegSetValueExW(hKey, L"AntSpeed", 0, REG_DWORD, (const BYTE*)&g_AntSpeed, sizeof(int));
 		RegSetValueExW(hKey, L"CurlCount", 0, REG_DWORD, (const BYTE*)&g_CurlCount, sizeof(int));
-		RegSetValueExW(hKey, L"RandomPool", 0, REG_DWORD, (const BYTE*)&g_RandomPool, sizeof(unsigned int));
+		RegSetValueExW(hKey, L"RandomPool", 0, REG_QWORD, (const BYTE*)&g_RandomPool, sizeof(uint64_t));
 		RegCloseKey(hKey);
 	}
 }

@@ -138,10 +138,33 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 		data->startTime = GetTickCount64();
 		initPerlin(12345, data->perm);
 
+		RenderContext ctx;
+		ctx.hdc = memDC;
+		ctx.data = data;
+		ctx.width = width;
+		ctx.height = height;
+		ctx.rect = rect;
+		if (data->hFont) {
+			TEXTMETRIC tm;
+			HGDIOBJ oldF = SelectObject(memDC, data->hFont);
+			if (GetTextMetrics(memDC, &tm) && tm.tmAveCharWidth > 0 && tm.tmHeight > 0) {
+				ctx.charWidth = tm.tmAveCharWidth;
+				ctx.charHeight = tm.tmHeight;
+				ctx.termCols = width / tm.tmAveCharWidth;
+				ctx.termRows = height / tm.tmHeight;
+			}
+			SelectObject(memDC, oldF);
+		}
+		ctx.deltaTime = 0.033f;
+		ctx.totalTime = 0.0;
+		ctx.frameIndex = 0;
+
 		// 1. Warmup iterations (settles simulation and initial GDI subsystem cache)
 		for (int w = 0; w < warmupFrames; ++w) {
 			if (s_abortVisual) break;
-			g_renderers[mode](memDC, data, width, height, rect);
+			ctx.frameIndex = w;
+			ctx.totalTime = w * 0.033;
+			ScreensaverRegistry::Execute(mode, ctx);
 			if (visual && winHdc) {
 				BitBlt(winHdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 				MSG msg;
@@ -171,9 +194,12 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 				gdiMidPoint = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
 			}
 
+			ctx.frameIndex = warmupFrames + f;
+			ctx.totalTime = (warmupFrames + f) * 0.033;
+
 			LARGE_INTEGER t0, t1;
 			QueryPerformanceCounter(&t0);
-			g_renderers[mode](memDC, data, width, height, rect);
+			ScreensaverRegistry::Execute(mode, ctx);
 			QueryPerformanceCounter(&t1);
 
 			double ms = (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)freq.QuadPart;

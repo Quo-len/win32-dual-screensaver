@@ -49,7 +49,8 @@ extern int g_CurlCount;
 extern int g_ModePrimary;
 extern int g_ModeSecondary;
 extern int g_RandomMode;
-extern unsigned int g_RandomPool;
+#include <cstdint>
+extern uint64_t g_RandomPool;
 extern const WCHAR* REG_PATH;
 extern const WCHAR* g_modeNames[];
 

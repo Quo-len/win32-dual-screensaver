@@ -28,33 +28,6 @@ WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
 bool g_ShowDebugHUD = false;
 bool g_Force4K = false;
 
-const WCHAR* g_modeNames[] = {
-	L"Donut", L"Game of Life", L"Matrix", L"Earth",
-	L"Blank", L"Julia Spirals", L"3D Starfield", L"Bouncing DVD Logo",
-	L"Grid", L"Pong", L"Maze Generator", L"Odometer Clock",
-	L"Perlin Flow Field", L"ASCII Fire", L"Hex Memory Dump", L"Sorting Algorithms",
-	L"Langton's Ant Symmetrical",
-	L"Pipes", L"Brian's Brain",
-	L"Mandelbrot Zoom", L"Clifford Attractor", L"Curl Noise Particles",
-	L"Harmonograph", L"Bad Apple (ASCII)", L"ASCIIQuarium",
-	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)",
-	L"Self-Playing Snake"
-};
-
-const RenderFn g_renderers[] = {
-	RenderDonut, RenderGoL,    RenderMatrix, RenderEarth,
-	RenderBlank, RenderJulia,  RenderStars,  RenderDVD,
-	RenderGrid,  RenderPong,   RenderMaze,   RenderClock,
-	RenderPerlin, RenderFire, RenderMemoryDump,
-	RenderRandomSort, RenderLangton,
-	RenderPipes, RenderBriansBrain,
-	RenderMandelbrot, RenderClifford, RenderCurlNoise,
-	RenderHarmonograph, RenderBadApple, RenderASCIIQuarium,
-	RenderBonsai, RenderNyanCat,
-	RenderSnake
-};
-
-const int g_numScreensavers = (int)(sizeof(g_renderers) / sizeof(g_renderers[0]));
 #define NUM_SCREENSAVERS g_numScreensavers
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -97,21 +70,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		g_Force4K = true;
 	}
 
-	const struct { const wchar_t* name; int idx; } modeMap[] = {
-		{L"donut", 0}, {L"gol", 1}, {L"matrix", 2}, {L"earth", 3},
-		{L"blank", 4}, {L"julia", 5}, {L"stars", 6}, {L"dvd", 7},
-		{L"grid", 8}, {L"pong", 9}, {L"maze", 10}, {L"clock", 11},
-		{L"perlin", 12}, {L"fire", 13}, {L"memory", 14}, {L"sort", 15},
-		{L"ant", 16},
-		{L"pipes", 17}, {L"brain", 18}, {L"mandelbrot", 19}, {L"clifford", 20}, {L"curl", 21},
-		{L"harmonograph", 22}, {L"harmo", 22},
-		{L"badapple", 23}, {L"bad-apple", 23}, {L"apple", 23}, {L"ascii", 23},
-		{L"asciiquarium", 24}, {L"aquarium", 24}, {L"fish", 24},
-		{L"cbonsai", 25}, {L"bonsai", 25}, {L"tree", 25},
-		{L"nyancat", 26}, {L"nyan", 26}, {L"cat", 26},
-		{L"snake", 27}, {L"ouroboros", 27}
-	};
-
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);
 	WCHAR* context = NULL;
 	WCHAR* token = wcstok_s(cmdCopy, L" \t", &context);
@@ -125,9 +83,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 	if (foundCount == 1 || foundCount == 2) {
 		int found1 = -1, found2 = -1;
-		for (int i = 0; i < (int)(sizeof(modeMap) / sizeof(modeMap[0])); ++i) {
-			if (foundArgs[0] && _wcsicmp(foundArgs[0], modeMap[i].name) == 0) found1 = modeMap[i].idx;
-			if (foundCount == 2 && foundArgs[1] && _wcsicmp(foundArgs[1], modeMap[i].name) == 0) found2 = modeMap[i].idx;
+		if (foundArgs[0]) {
+			const auto* def1 = ScreensaverRegistry::FindByAlias(foundArgs[0]);
+			if (def1) found1 = def1->id;
+		}
+		if (foundCount == 2 && foundArgs[1]) {
+			const auto* def2 = ScreensaverRegistry::FindByAlias(foundArgs[1]);
+			if (def2) found2 = def2->id;
 		}
 		if (found1 >= 0 && foundCount == 1) {
 			g_ModePrimary = found1;
@@ -151,7 +113,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	if (g_RandomMode) {
 		std::vector<int> pool;
 		for (int i = 0; i < NUM_SCREENSAVERS; ++i) {
-			if (g_RandomPool & (1u << i)) {
+			if (g_RandomPool & (1ULL << i)) {
 				pool.push_back(i);
 			}
 		}
@@ -479,12 +441,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		int mode = data->isPreview ? 0 : (data->isPrimary ? g_ModePrimary : g_ModeSecondary);
 
+		RenderContext ctx;
+		ctx.hdc = memDC;
+		ctx.data = data;
+		ctx.width = width;
+		ctx.height = height;
+		ctx.rect = rect;
+
+		if (data->hFont) {
+			TEXTMETRIC tm;
+			HGDIOBJ oldF = SelectObject(memDC, data->hFont);
+			if (GetTextMetrics(memDC, &tm) && tm.tmAveCharWidth > 0 && tm.tmHeight > 0) {
+				ctx.charWidth = tm.tmAveCharWidth;
+				ctx.charHeight = tm.tmHeight;
+				ctx.termCols = width / tm.tmAveCharWidth;
+				ctx.termRows = height / tm.tmHeight;
+			}
+			SelectObject(memDC, oldF);
+		}
+
+		ctx.deltaTime = (data->lastRenderTimeMs > 0.0) ? (float)(data->lastRenderTimeMs / 1000.0) : 0.033f;
+		ctx.totalTime = (double)(GetTickCount64() - data->startTime) / 1000.0;
+		ctx.frameIndex = data->frameCounter;
+
 		LARGE_INTEGER tStart, tEnd, tFreq;
 		QueryPerformanceFrequency(&tFreq);
 		QueryPerformanceCounter(&tStart);
 
-		if (mode >= 0 && mode < NUM_SCREENSAVERS)
-			g_renderers[mode](memDC, data, width, height, rect);
+		ScreensaverRegistry::Execute(mode, ctx);
 
 		QueryPerformanceCounter(&tEnd);
 		double frameMs = (double)(tEnd.QuadPart - tStart.QuadPart) * 1000.0 / (double)tFreq.QuadPart;
