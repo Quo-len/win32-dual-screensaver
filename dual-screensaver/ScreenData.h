@@ -277,6 +277,39 @@ struct ScreenData {
     int nyanHeightInChars = 0;
     std::vector<NyanStar> nyanStars;
 
+    // Self-Playing Snake
+    struct SnakeParticle {
+        float x, y;
+        float vx, vy;
+        float life;
+        float maxLife;
+        COLORREF color;
+        wchar_t ch;
+    };
+    struct SnakeState {
+        bool initialized = false;
+        int cols = 0;
+        int rows = 0;
+        int cellSize = 0;
+        int offsetX = 0;
+        int offsetY = 0;
+        int theme = 0;
+        int score = 0;
+        int highScore = 0;
+        int applesEaten = 0;
+        int totalCells = 0;
+        DWORD lastMoveTick = 0;
+        DWORD winStartTime = 0;
+        bool isWon = false;
+        POINT food = { 0, 0 };
+        int stuckFrames = 0;
+        DWORD timeAccumulator = 0;
+        std::vector<POINT> body;
+        std::vector<int> cycle;
+        std::vector<uint8_t> occupied;
+        std::vector<SnakeParticle> particles;
+    } snake;
+
     ID3D11Device* pDevice = nullptr;
     ID3D11DeviceContext* pContext = nullptr;
     IDXGISwapChain* pSwapChain = nullptr;

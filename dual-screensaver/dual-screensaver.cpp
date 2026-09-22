@@ -37,7 +37,8 @@ const WCHAR* g_modeNames[] = {
 	L"Pipes", L"Brian's Brain",
 	L"Mandelbrot Zoom", L"Clifford Attractor", L"Curl Noise Particles",
 	L"Harmonograph", L"Bad Apple (ASCII)", L"ASCIIQuarium",
-	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)"
+	L"cbonsai (Bonsai Tree)", L"Nyan Cat (ASCII)",
+	L"Self-Playing Snake"
 };
 
 const RenderFn g_renderers[] = {
@@ -49,7 +50,8 @@ const RenderFn g_renderers[] = {
 	RenderPipes, RenderBriansBrain,
 	RenderMandelbrot, RenderClifford, RenderCurlNoise,
 	RenderHarmonograph, RenderBadApple, RenderASCIIQuarium,
-	RenderBonsai, RenderNyanCat
+	RenderBonsai, RenderNyanCat,
+	RenderSnake
 };
 
 const int g_numScreensavers = (int)(sizeof(g_renderers) / sizeof(g_renderers[0]));
@@ -106,7 +108,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{L"badapple", 23}, {L"bad-apple", 23}, {L"apple", 23}, {L"ascii", 23},
 		{L"asciiquarium", 24}, {L"aquarium", 24}, {L"fish", 24},
 		{L"cbonsai", 25}, {L"bonsai", 25}, {L"tree", 25},
-		{L"nyancat", 26}, {L"nyan", 26}, {L"cat", 26}
+		{L"nyancat", 26}, {L"nyan", 26}, {L"cat", 26},
+		{L"snake", 27}, {L"ouroboros", 27}
 	};
 
 	WCHAR* cmdCopy = _wcsdup(lpCmdLine);

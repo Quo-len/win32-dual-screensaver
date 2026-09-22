@@ -47,6 +47,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 29 p
 | 24  | **ASCIIQuarium**         | Vibrant underwater ecosystem with swimming fish, jellyfish, crabs & kelp   |
 | 25  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
 | 26  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
+| 27  | **Self-Playing Snake**   | Autonomous snake with spanning-tree Hamiltonian pathing, shortcuts & glow   |
 
 ---
 
@@ -166,7 +167,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`, `snake`.
 
 ---
 

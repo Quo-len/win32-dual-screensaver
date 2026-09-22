@@ -29,3 +29,4 @@ void RenderBadApple(HDC memDC, ScreenData* data, int width, int height, const RE
 void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderBonsai(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
 void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);
+void RenderSnake(HDC memDC, ScreenData* data, int width, int height, const RECT& rect);

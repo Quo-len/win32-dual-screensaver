@@ -152,6 +152,9 @@
     <ClCompile Include="renderers\RenderNyanCat.cpp">
       <Filter>Source Files\renderers</Filter>
     </ClCompile>
+    <ClCompile Include="renderers\RenderSnake.cpp">
+      <Filter>Source Files\renderers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="dual-screensaver.rc">

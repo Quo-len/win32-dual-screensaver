@@ -195,6 +195,7 @@
     <ClCompile Include="renderers\RenderASCIIQuarium.cpp" />
     <ClCompile Include="renderers\RenderBonsai.cpp" />
     <ClCompile Include="renderers\RenderNyanCat.cpp" />
+    <ClCompile Include="renderers\RenderSnake.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="ConfigUI.cpp" />
   </ItemGroup>
