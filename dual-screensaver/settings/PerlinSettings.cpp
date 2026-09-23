@@ -1,5 +1,8 @@
 #include "PerlinSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr float DEFAULT_PERLINSCALE = 0.002f;
+constexpr float DEFAULT_PERLINSPEED = 2.0f;
 
 float g_PerlinScale = DEFAULT_PERLINSCALE;
 float g_PerlinSpeed = DEFAULT_PERLINSPEED;

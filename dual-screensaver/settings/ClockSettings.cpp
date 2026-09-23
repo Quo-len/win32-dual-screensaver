@@ -1,5 +1,7 @@
 #include "ClockSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr int DEFAULT_TEXTSIZE = 20;
 
 int g_TextSize = DEFAULT_TEXTSIZE;
 

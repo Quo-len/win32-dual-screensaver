@@ -1,4 +1,3 @@
-#include "Defaults.h"
 #include "framework.h"
 #include "dual-screensaver.h"
 #include "ConfigUI.h"
@@ -26,7 +25,6 @@ WCHAR szWindowClass[MAX_LOADSTRING] = L"DualSaverClass";
 bool g_ShowDebugHUD = false;
 bool g_Force4K = false;
 
-#define NUM_SCREENSAVERS g_numScreensavers
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -110,13 +108,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	if (g_RandomMode) {
 		std::vector<int> pool;
-		for (int i = 0; i < NUM_SCREENSAVERS; ++i) {
+		int numScreensavers = ScreensaverRegistry::GetCount();
+		for (int i = 0; i < numScreensavers; ++i) {
 			if (g_RandomPool & (1ULL << i)) {
 				pool.push_back(i);
 			}
 		}
 		if (pool.empty()) {
-			for (int i = 0; i < NUM_SCREENSAVERS; ++i) pool.push_back(i);
+			for (int i = 0; i < numScreensavers; ++i) pool.push_back(i);
 		}
 		g_ModePrimary = pool[rand() % pool.size()];
 		g_ModeSecondary = pool[rand() % pool.size()];

@@ -1,13 +1,10 @@
 #include "ConfigUI.h"
 #include "Settings.h"
-#include "Defaults.h"
 #include "ScreensaverRegistry.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 extern HINSTANCE hInst;
-
-#define NUM_SCREENSAVERS 28  
 
 #define IDAPPLY_MAIN 2200
 #define IDAPPLY_SUB 2300
@@ -153,9 +150,10 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		int col2X = 350;
 		int chkW = 200;
 		int btnW = 90;
-		int half = (NUM_SCREENSAVERS + 1) / 2;
+		int numScreensavers = ScreensaverRegistry::GetCount();
+		int half = (numScreensavers + 1) / 2;
 
-		for (int i = 0; i < NUM_SCREENSAVERS; i++)
+		for (int i = 0; i < numScreensavers; i++)
 		{
 			int x = (i < half) ? col1X : col2X;
 			int y = startY + ((i < half) ? i : (i - half)) * rowH;
@@ -197,7 +195,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		SendMessage(hLblSec, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hC2, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		for (int i = 0; i < NUM_SCREENSAVERS; i++) {
+		for (int i = 0; i < numScreensavers; i++) {
 			SendMessage(hC1, CB_ADDSTRING, 0, (LPARAM)g_modeNames[i]);
 			SendMessage(hC2, CB_ADDSTRING, 0, (LPARAM)g_modeNames[i]);
 		}
@@ -231,7 +229,8 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	case WM_COMMAND:
 	{
 		WORD id = LOWORD(wParam);
-		if (id >= IDC_SETTINGS_BASE && id < IDC_SETTINGS_BASE + NUM_SCREENSAVERS)
+		int numScreensavers = ScreensaverRegistry::GetCount();
+		if (id >= IDC_SETTINGS_BASE && id < IDC_SETTINGS_BASE + numScreensavers)
 		{
 			int ss_id = id - IDC_SETTINGS_BASE;
 			
@@ -259,7 +258,7 @@ LRESULT CALLBACK ConfigWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		else if (id == IDAPPLY_MAIN)
 		{
 			uint64_t newMask = 0;
-			for (int i = 0; i < NUM_SCREENSAVERS; i++)
+			for (int i = 0; i < numScreensavers; i++)
 			{
 				if (IsDlgButtonChecked(hWnd, IDC_POOL_CHECK_BASE + i) == BST_CHECKED)
 				{

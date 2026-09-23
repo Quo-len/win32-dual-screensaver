@@ -1,5 +1,8 @@
 #include "GolSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr int DEFAULT_GOLCELLSIZE = 2;
+constexpr int DEFAULT_GOLSPEED = 33;
 
 int g_GolCellSize = DEFAULT_GOLCELLSIZE;
 int g_GolSpeed = DEFAULT_GOLSPEED;

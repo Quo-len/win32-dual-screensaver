@@ -1,5 +1,8 @@
 #include "MazeSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr float DEFAULT_MAZEBUILDSPEED = 10.0f;
+constexpr float DEFAULT_MAZESOLVESPEED = 10.0f;
 
 float g_MazeBuildSpeed = DEFAULT_MAZEBUILDSPEED;
 float g_MazeSolveSpeed = DEFAULT_MAZESOLVESPEED;

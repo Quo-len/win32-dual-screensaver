@@ -60,9 +60,6 @@
     <ClInclude Include="ScreensaverRegistry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Defaults.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="settings\*.h">
       <Filter>Header Files\settings</Filter>
     </ClInclude>

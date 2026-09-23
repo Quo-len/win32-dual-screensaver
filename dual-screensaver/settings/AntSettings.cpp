@@ -1,5 +1,8 @@
 #include "AntSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr int DEFAULT_ANT_COUNT = 2;
+constexpr int DEFAULT_ANT_SPEED = 200;
 
 int g_AntCount = DEFAULT_ANT_COUNT;
 int g_AntSpeed = DEFAULT_ANT_SPEED;

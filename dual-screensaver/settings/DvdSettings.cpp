@@ -1,5 +1,7 @@
 #include "DvdSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr float DEFAULT_DVDSPEED = 10.0f;
 
 float g_DvdSpeed = DEFAULT_DVDSPEED;
 

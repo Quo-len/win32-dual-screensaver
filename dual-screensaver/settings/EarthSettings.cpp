@@ -1,5 +1,7 @@
 #include "EarthSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr float DEFAULT_EARTHSPEED = 0.05f;
 
 float g_EarthSpeed = DEFAULT_EARTHSPEED;
 

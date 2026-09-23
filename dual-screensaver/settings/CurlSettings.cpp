@@ -1,5 +1,7 @@
 #include "CurlSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr int DEFAULT_CURL_COUNT = 5000;
 
 int g_CurlCount = DEFAULT_CURL_COUNT;
 

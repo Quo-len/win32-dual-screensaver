@@ -1,5 +1,10 @@
 #include "DonutSettings.h"
-#include "../Defaults.h"
+#include <vector>
+
+constexpr float DEFAULT_ASPEED = 0.04f;
+constexpr float DEFAULT_BSPEED = 0.02f;
+constexpr float DEFAULT_DONUTSIZE = 2.0f;
+constexpr float DEFAULT_DONUTDISTANCE = 3.0f;
 
 float g_ASpeed = DEFAULT_ASPEED;
 float g_BSpeed = DEFAULT_BSPEED;

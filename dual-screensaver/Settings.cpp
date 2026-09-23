@@ -1,6 +1,10 @@
 #include "Settings.h"
-#include "Defaults.h"
 #include "ScreensaverRegistry.h"
+
+constexpr int DEFAULT_MODEPRIMARY = 11;
+constexpr int DEFAULT_MODESECONDARY = 1;
+constexpr int DEFAULT_RANDOMMODE = 0;
+constexpr uint64_t DEFAULT_RANDOM_POOL = 0xFFFFFFFFFFFFFFFFULL;
 
 int g_ModePrimary = DEFAULT_MODEPRIMARY;
 int g_ModeSecondary = DEFAULT_MODESECONDARY;
