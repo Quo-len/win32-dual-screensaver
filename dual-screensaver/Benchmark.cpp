@@ -1,6 +1,7 @@
 #include "Benchmark.h"
 #include "ScreenData.h"
 #include "dual-screensaver.h"
+#include "utils/SystemMetrics.h"
 
 #include <iostream>
 #include <fstream>
@@ -120,6 +121,15 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 	int totalFails = 0;
 	LARGE_INTEGER totalStart, totalEnd;
 	QueryPerformanceCounter(&totalStart);
+
+	FILETIME overallFtCreate, overallFtExit, overallK0, overallU0;
+	GetProcessTimes(GetCurrentProcess(), &overallFtCreate, &overallFtExit, &overallK0, &overallU0);
+	DWORD initialGdiHandles = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+	DWORD peakGdiHandles = initialGdiHandles;
+
+	double peakCpuPercent = 0.0;
+	double sumCpuPercent = 0.0;
+	int screensaverCount = 0;
 
 	for (int mode = 0; mode < g_numScreensavers; ++mode)
 	{
@@ -245,6 +255,13 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 		double maxSingleCore = 100.0 / (double)numCores;
 		if (cpuPercent > maxSingleCore) cpuPercent = maxSingleCore;
 
+		peakCpuPercent = (std::max)(peakCpuPercent, cpuPercent);
+		sumCpuPercent += cpuPercent;
+		screensaverCount++;
+
+		DWORD curGdi = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+		if (curGdi > peakGdiHandles) peakGdiHandles = curGdi;
+
 		// 3. Cleanup ScreenData
 		if (data->hFont) DeleteObject(data->hFont);
 		delete data;
@@ -319,6 +336,24 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 		DestroyWindow(benchWnd);
 	}
 
+	FILETIME overallK1, overallU1;
+	GetProcessTimes(GetCurrentProcess(), &overallFtCreate, &overallFtExit, &overallK1, &overallU1);
+	ProcessMetrics finalMetrics = SystemMetrics::GetCurrentMetrics();
+	if (finalMetrics.gdiHandles > peakGdiHandles) peakGdiHandles = finalMetrics.gdiHandles;
+
+	ULARGE_INTEGER o_ku0, o_uu0, o_ku1, o_uu1;
+	o_ku0.LowPart = overallK0.dwLowDateTime; o_ku0.HighPart = overallK0.dwHighDateTime;
+	o_uu0.LowPart = overallU0.dwLowDateTime; o_uu0.HighPart = overallU0.dwHighDateTime;
+	o_ku1.LowPart = overallK1.dwLowDateTime; o_ku1.HighPart = overallK1.dwHighDateTime;
+	o_uu1.LowPart = overallU1.dwLowDateTime; o_uu1.HighPart = overallU1.dwHighDateTime;
+
+	ULONGLONG totalProc100ns = (o_ku1.QuadPart - o_ku0.QuadPart) + (o_uu1.QuadPart - o_uu0.QuadPart);
+	double totalProcCpuMs = (double)totalProc100ns / 10000.0;
+	double overallAppCpuAvg = (totalDurationSec > 0.0) ? ((totalProcCpuMs / (totalDurationSec * 1000.0)) * 100.0 / (double)numCores) : 0.0;
+	double perModeAvgCpu = (screensaverCount > 0) ? (sumCpuPercent / (double)screensaverCount) : 0.0;
+	int totalScreensaverLeaks = 0;
+	for (const auto& r : results) totalScreensaverLeaks += r.gdiLeaks;
+
 	// Summary
 	std::stringstream summary;
 	summary << "----------------------------------------------------------------------------------------------------------\n"
@@ -326,6 +361,19 @@ int RunBenchmark(int width, int height, int warmupFrames, int benchFrames, bool 
 	        << (g_numScreensavers - totalFails) << " Passed | "
 	        << totalFails << " Failed | Duration: "
 	        << std::fixed << std::setprecision(2) << totalDurationSec << "s\n"
+	        << "==========================================================================================================\n"
+	        << "                         OVERALL APPLICATION RESOURCE UTILIZATION\n"
+	        << "==========================================================================================================\n"
+	        << " Process CPU Usage   : Overall Session Avg: " << std::setprecision(1) << overallAppCpuAvg 
+	        << "% (Active Mode Avg: " << perModeAvgCpu << "%, Peak: " << peakCpuPercent << "%)\n"
+	        << "                       Total Process CPU Time: " << (int)totalProcCpuMs << " ms (" << numCores << " CPU cores detected)\n"
+	        << " Memory / RAM        : Working Set: " << std::setprecision(1) << finalMetrics.ramMB
+	        << " MB | Peak Working Set: " << finalMetrics.peakRamMB 
+	        << " MB | Private Commit: " << finalMetrics.commitMB << " MB\n"
+	        << " GPU & Video Memory  : " << (finalMetrics.gpuName[0] ? finalMetrics.gpuName : "GPU")
+	        << " | Process VRAM: " << std::setprecision(1) << finalMetrics.vramMB << " MB | Engine: GDI Software (~0% GPU)\n"
+	        << " GDI Resource Totals : Initial: " << initialGdiHandles << " | Peak: " << peakGdiHandles 
+	        << " | Final: " << finalMetrics.gdiHandles << " | Screensaver Leaks: " << totalScreensaverLeaks << " objects\n"
 	        << "==========================================================================================================\n\n";
 	logBoth(summary.str());
 

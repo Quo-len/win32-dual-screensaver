@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include "ScreenData.h"
 #include "Benchmark.h"
+#include "utils/SystemMetrics.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -204,99 +205,6 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	return TRUE;
 }
 
-static double GetCurrentProcessCpuUsage()
-{
-	static ULONGLONG s_lastSystemTime = 0;
-	static ULONGLONG s_lastProcessTime = 0;
-	static double s_cpuPercent = 0.0;
-	static DWORD s_numCores = 0;
-
-	if (s_numCores == 0)
-	{
-		SYSTEM_INFO sysInfo;
-		GetSystemInfo(&sysInfo);
-		s_numCores = sysInfo.dwNumberOfProcessors;
-		if (s_numCores == 0) s_numCores = 1;
-	}
-
-	FILETIME ftCreation, ftExit, ftKernel, ftUser, ftNow;
-	GetSystemTimeAsFileTime(&ftNow);
-	if (!GetProcessTimes(GetCurrentProcess(), &ftCreation, &ftExit, &ftKernel, &ftUser))
-	{
-		return 0.0;
-	}
-
-	ULARGE_INTEGER now, kernel, user;
-	now.LowPart = ftNow.dwLowDateTime; now.HighPart = ftNow.dwHighDateTime;
-	kernel.LowPart = ftKernel.dwLowDateTime; kernel.HighPart = ftKernel.dwHighDateTime;
-	user.LowPart = ftUser.dwLowDateTime; user.HighPart = ftUser.dwHighDateTime;
-
-	ULONGLONG currentSystemTime = now.QuadPart;
-	ULONGLONG currentProcessTime = kernel.QuadPart + user.QuadPart;
-
-	if (s_lastSystemTime != 0)
-	{
-		ULONGLONG sysDiff = currentSystemTime - s_lastSystemTime;
-		ULONGLONG procDiff = currentProcessTime - s_lastProcessTime;
-		// Refresh every ~250ms
-		if (sysDiff >= 2500000)
-		{
-			double percent = ((double)procDiff / (double)(sysDiff * s_numCores)) * 100.0;
-			s_cpuPercent = (percent < 0.0) ? 0.0 : ((percent > 100.0) ? 100.0 : percent);
-			s_lastSystemTime = currentSystemTime;
-			s_lastProcessTime = currentProcessTime;
-		}
-	}
-	else
-	{
-		s_lastSystemTime = currentSystemTime;
-		s_lastProcessTime = currentProcessTime;
-	}
-
-	return s_cpuPercent;
-}
-
-static double GetProcessVramUsageMB(char* outAdapterName, size_t nameBufSize)
-{
-	static IDXGIFactory4* s_pFactory = nullptr;
-	static IDXGIAdapter3* s_pAdapter = nullptr;
-	static bool s_inited = false;
-	static char s_adapterName[128] = "GPU";
-
-	if (!s_inited)
-	{
-		s_inited = true;
-		if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&s_pFactory))))
-		{
-			IDXGIAdapter* pAdapt = nullptr;
-			if (SUCCEEDED(s_pFactory->EnumAdapters(0, &pAdapt)))
-			{
-				DXGI_ADAPTER_DESC desc;
-				if (SUCCEEDED(pAdapt->GetDesc(&desc)))
-				{
-					WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, s_adapterName, sizeof(s_adapterName), NULL, NULL);
-				}
-				pAdapt->QueryInterface(IID_PPV_ARGS(&s_pAdapter));
-				pAdapt->Release();
-			}
-		}
-	}
-
-	if (outAdapterName && nameBufSize > 0)
-	{
-		strncpy_s(outAdapterName, nameBufSize, s_adapterName, _TRUNCATE);
-	}
-
-	if (s_pAdapter)
-	{
-		DXGI_QUERY_VIDEO_MEMORY_INFO memInfo = {};
-		if (SUCCEEDED(s_pAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memInfo)))
-		{
-			return (double)memInfo.CurrentUsage / (1024.0 * 1024.0);
-		}
-	}
-	return 0.0;
-}
 
 static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int mode)
 {
@@ -330,13 +238,11 @@ static void DrawDebugHUD(HDC hdc, ScreenData* data, int width, int height, int m
 	TextOutA(hdc, boxX + 12, boxY + 10, "[F5] PERFORMANCE HUD", 20);
 
 	// Metrics
-	DWORD gdiHandles = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
-	PROCESS_MEMORY_COUNTERS pmc = { sizeof(pmc) };
-	GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
-	double ramMB = (double)pmc.WorkingSetSize / (1024.0 * 1024.0);
-	double cpuPercent = GetCurrentProcessCpuUsage();
-	char gpuName[64] = "GPU";
-	double vramMB = GetProcessVramUsageMB(gpuName, sizeof(gpuName));
+	ProcessMetrics pm = SystemMetrics::GetCurrentMetrics();
+	double ramMB = pm.ramMB;
+	double cpuPercent = pm.cpuPercent;
+	double vramMB = pm.vramMB;
+	DWORD gdiHandles = pm.gdiHandles;
 
 	char buf[128];
 
