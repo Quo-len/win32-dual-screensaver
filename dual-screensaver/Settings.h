@@ -13,6 +13,7 @@
 #include "settings/PerlinSettings.h"
 #include "settings/AntSettings.h"
 #include "settings/CurlSettings.h"
+#include "settings/TetrisSettings.h"
 
 // Main Configuration Dialog Control IDs
 #define IDC_COMBO_PRIMARY         1007

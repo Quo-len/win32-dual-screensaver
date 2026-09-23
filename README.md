@@ -1,8 +1,8 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 29 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 multi-monitor screensaver for Windows with 31 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
 
-> 📚 **Navigation**: [Features](#features) • [Visual Modes](#visual-modes-29-built-in) • [Installation](#installation-windows-built-in-screensaver) • [CLI & Hotkeys](#command-line-flags--controls) • [🎬 Video Converter Guide](scripts/README.md)
+> 📚 **Navigation**: [Features](#features) • [Visual Modes](#visual-modes-31-built-in) • [Installation](#installation-windows-built-in-screensaver) • [CLI & Hotkeys](#command-line-flags--controls) • [🎬 Video Converter Guide](scripts/README.md)
 
 ---
 
@@ -16,7 +16,7 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 29 p
 
 ---
 
-## Visual Modes (29 Built-in)
+## Visual Modes (31 Built-in)
 
 | #   | Mode                     | Description                                                                |
 | --- | ------------------------ | -------------------------------------------------------------------------- |
@@ -48,6 +48,9 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 29 p
 | 25  | **cbonsai**              | Procedural generative bonsai trees with L-systems and seasonal themes      |
 | 26  | **Nyan Cat (ASCII)**     | Animated classic meme cat flying through space with rainbow trail & stars  |
 | 27  | **Self-Playing Snake**   | Autonomous snake with spanning-tree Hamiltonian pathing, shortcuts & glow  |
+| 28  | **Space Invaders**       | Autonomous arcade space defense with marching alien armada, bunkers & UFO  |
+| 29  | **Pac-Man**              | Autonomous arcade maze with authentic ghost AI personalities, fruit & energizer chase |
+| 30  | **Tetris**               | Self-playing arcade Tetris with Pierre Dellacherie heuristic AI & retro UI |
 
 ---
 
@@ -138,6 +141,7 @@ Settings are managed via a dedicated graphical window and saved to the registry:
   - Maze: Generation speed, solver step speed
   - Perlin: Scale, particle velocity
   - Langton's Ant: Ant set count, simulation speed (ops/frame)
+  - Tetris: Initial falling speed (with auto-scaling progression rate and maximum speed cap)
 - **Display Routing**:
   - Assign any mode independently to **Primary** and **Secondary** monitors.
 - **Randomizer & Pool**:
@@ -167,7 +171,7 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 ### Supported Mode Names for CLI Launch
 
-`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`, `snake`.
+`donut`, `gol`, `matrix`, `earth`, `blank`, `julia`, `stars`, `dvd`, `grid`, `pong`, `maze`, `clock`, `perlin`, `fire`, `memory`, `sort`, `ant`, `pipes`, `brain`, `mandelbrot`, `clifford`, `curl`, `harmonograph`, `badapple`, `asciiquarium`, `cbonsai`, `nyancat`, `snake`, `invaders`, `pacman`, `tetris`.
 
 ---
 
