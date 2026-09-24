@@ -58,7 +58,7 @@ modes:
     @Write-Host "`nAvailable screensaver modes for 'just run <mode>':" -ForegroundColor Cyan
     @Write-Host "  Simulations     : " -NoNewline -ForegroundColor Yellow; Write-Host "matrix, gol, ant, brain, perlin, fire"
     @Write-Host "  Geometry & Math : " -NoNewline -ForegroundColor Yellow; Write-Host "donut, julia, mandelbrot, clifford, curl, harmonograph (harmo), grid, pipes"
-    @Write-Host "  Retro & Visuals : " -NoNewline -ForegroundColor Yellow; Write-Host "tetris (blocks), pacman (pac), invaders (space/galaga), invaders-legacy (space-legacy), arkanoid (breakout), asteroids (rocks), snake, nyancat (nyan), asciiquarium (aquarium/fish), cbonsai (tree/bonsai), badapple (apple), stars, dvd, pong, pong-legacy, maze, sort, memory, clock, earth, blank`n"
+    @Write-Host "  Retro & Visuals : " -NoNewline -ForegroundColor Yellow; Write-Host "tetris (blocks), pacman (pac), invaders (space/galaga), invaders-legacy (space-legacy), arkanoid (breakout), asteroids (rocks), snake, nyancat (nyan), asciiquarium (aquarium/fish), cbonsai (tree/bonsai), badapple (apple), stars, dvd, pong, pong-legacy, maze, maze-legacy, sort, sort-legacy, memory, clock, earth, blank`n"
 
 
 # Clean build output and intermediate folders
