@@ -25,6 +25,9 @@ static const COLORREF COL_SHIP_CANNON = RGB(35, 35, 35);
 static const COLORREF COL_WHALE_BODY  = RGB(90, 115, 245); // Ocean blue-indigo
 static const COLORREF COL_WHALE_EYE   = RGB(255, 255, 255);
 static const COLORREF COL_WHALE_SPOUT = RGB(85, 235, 255); // Cyan spout
+static const COLORREF COL_CASTLE_WALL = RGB(225, 230, 240); // White/silver stone walls & battlements
+static const COLORREF COL_CASTLE_ROOF = RGB(240, 195, 55);  // Sand/gold spire roof & arched doorway
+static const COLORREF COL_CASTLE_FLAG = RGB(255, 70, 70);   // Red pennant flag
 
 static const COLORREF FISH_COLORS[] = {
     RGB(255, 140, 30),  // Goldfish orange
@@ -121,7 +124,7 @@ static void InitAquarium(AquaState& s, int cols, int rows) {
     s.seaweed.clear();
     s.jelly.clear();
 
-    // Spawn Seaweed across the seabed
+    // Spawn Seaweed across the seabed (spawns across full seabed, including in front of castle)
     int seaweedCount = (std::max)(6, cols / 10);
     for (int i = 0; i < seaweedCount; ++i) {
         AquaSeaweed sw;
@@ -132,12 +135,18 @@ static void InitAquarium(AquaState& s, int cols, int rows) {
         s.seaweed.push_back(sw);
     }
 
-    // Spawn Fish
+    int waveRow = (rows < 22) ? 4 : 6;
+    int minFishY = waveRow + 5;
+    int maxFishY = rows - 5;
+    if (maxFishY <= minFishY) maxFishY = minFishY + 1;
+    int fishSpan = maxFishY - minFishY + 1;
+
+    // Spawn Fish (well below the multi-tier surface waves)
     int fishCount = (std::max)(12, cols / 7);
     for (int i = 0; i < fishCount; ++i) {
         AquaFish f;
         f.x = (float)(rand() % cols);
-        f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
+        f.y = (float)(rand() % fishSpan + minFishY);
         bool goRight = (rand() % 2 == 0);
         float spd = 0.25f + (float)(rand() % 50) / 100.0f;
         f.vx = goRight ? spd : -spd;
@@ -166,7 +175,7 @@ static void InitAquarium(AquaState& s, int cols, int rows) {
         j.vy = -0.16f - (float)(rand() % 10) / 100.0f;
         j.pulsePhase = (float)(rand() % 628) / 100.0f;
         j.swayOffset = (float)(rand() % 628) / 100.0f;
-        j.topLimit = (float)(rand() % (std::max)(1, rows / 4) + 8);
+        j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 5);
         j.color = JELLY_COLORS[rand() % NUM_JELLY_COLORS];
         s.jelly.push_back(j);
     }
@@ -244,20 +253,41 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
 
     int waveRow = (rows < 22) ? 4 : 6;
 
-    // 1. Water Surface & Waves
+    // 1. Water Surface & Waves (4-tier wave and underwater chop from Asciiquarium)
+    static const char* WAVE_SEGMENTS[4] = {
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "^^^^ ^^^  ^^^   ^^^    ^^^^      ",
+        "^^^^      ^^^^     ^^^    ^^     ",
+        "^^      ^^^^      ^^^    ^^^^^^  "
+    };
+    static const int WAVE_SEG_LEN = 33;
+
+    // Surface wave line
+    float wavePhase = timeVal * 1.5f;
     for (int x = 0; x < cols; ++x) {
-        float wave = sinf(timeVal * 1.5f + x * 0.35f);
+        float wave = sinf(wavePhase + x * 0.35f);
         COLORREF wCol = (wave > 0.4f) ? COL_WAVE_TOP : COL_WAVE;
         putChar(x, waveRow, '~', wCol);
+    }
 
-        // Sub-surface ripples (rows waveRow + 1 and waveRow + 2 from asciiquarium)
-        int seg1 = (x + (int)(timeVal * 1.2f)) % 14;
-        if (seg1 >= 0 && seg1 < 3) {
-            putChar(x, waveRow + 1, '^', COL_WAVE);
-        }
-        int seg2 = (x + (int)(timeVal * 0.8f) + 6) % 16;
-        if (seg2 >= 0 && seg2 < 4) {
-            putChar(x, waveRow + 2, '^', COL_WAVE);
+    // 3 sub-surface ripple / chop tiers
+    int waveOffsets[3] = {
+        (int)(timeVal * 1.8f),
+        (int)(timeVal * 1.3f),
+        (int)(timeVal * 0.9f)
+    };
+    for (int r = 0; r < 3; ++r) {
+        int targetY = waveRow + 1 + r;
+        if (targetY >= rows - 4) break;
+        const char* seg = WAVE_SEGMENTS[r + 1];
+        int off = waveOffsets[r];
+        for (int x = 0; x < cols; ++x) {
+            int idx = (x + off) % WAVE_SEG_LEN;
+            if (idx < 0) idx += WAVE_SEG_LEN;
+            char c = seg[idx];
+            if (c != ' ') {
+                putChar(x, targetY, c, COL_WAVE);
+            }
         }
     }
 
@@ -491,6 +521,62 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         putChar(x, sandRow + 1, s2, COL_SAND2);
     }
 
+    // 2b. Sand Castle on Seabed (Classic Joan Stark Asciiquarium Castle)
+    if (cols >= 36 && rows >= 18) {
+        int castleW = 31;
+        int castleH = 13;
+        int castleX = cols - castleW - 4;
+        if (castleX < 2) castleX = 2;
+        int castleY = sandRow - castleH + 1;
+
+        static const char* CASTLE_SHAPE[13] = {
+            "               T~~             ",
+            "               |               ",
+            "              /^\\              ",
+            "             /   \\             ",
+            " _   _   _  /     \\  _   _   _ ",
+            "[ ]_[ ]_[ ]/ _   _ \\[ ]_[ ]_[ ]",
+            "|_=__-_ =_|_[ ]_[ ]_|_=-___-__|",
+            " | _- =  | =_ = _    |= _=   | ",
+            " |= -[]  |- = _ =    |_-=_[] | ",
+            " | =_    |= - ___    | =_ =  | ",
+            " |=  []- |-  /| |\\   |=_ =[] | ",
+            " |- =_   | =| | | |  |- = -  | ",
+            " |_______|__|_|_|_|__|_______| "
+        };
+
+        static const char* CASTLE_MASK[13] = {
+            "                RR             ",
+            "                w              ",
+            "              yyy              ",
+            "             y   y             ",
+            "            y     y            ",
+            "           y       y           ",
+            "                               ",
+            "                               ",
+            "                               ",
+            "              yyy              ",
+            "             yy yy             ",
+            "            y y y y            ",
+            "            yyyyyyy            "
+        };
+
+        for (int r = 0; r < castleH; ++r) {
+            int cy = castleY + r;
+            if (cy <= waveRow + 3 || cy >= rows) continue;
+            for (int c = 0; c < castleW; ++c) {
+                char ch = CASTLE_SHAPE[r][c];
+                if (ch != ' ') {
+                    char m = CASTLE_MASK[r][c];
+                    COLORREF col = COL_CASTLE_WALL;
+                    if (m == 'R') col = COL_CASTLE_FLAG;
+                    else if (m == 'y') col = COL_CASTLE_ROOF;
+                    putChar(castleX + c, cy, ch, col);
+                }
+            }
+        }
+    }
+
     // 3. Seaweed Swaying
     for (const auto& sw : s.seaweed) {
         for (int h = 0; h < sw.height; ++h) {
@@ -536,7 +622,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
             // Reached apex below waves: transition to gentle descent
             if (j.y <= j.topLimit) {
                 j.state = 1;
-                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 2);
+                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 5);
             }
         } else {
             // Drifting / Swimming DOWN:
@@ -551,7 +637,7 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
                 j.state = 0;
                 j.vy = -0.16f - (float)(rand() % 10) / 100.0f;
                 j.swayOffset = (float)(rand() % 628) / 100.0f;
-                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 2);
+                j.topLimit = (float)(rand() % (std::max)(1, (rows - waveRow) / 4) + waveRow + 5);
                 j.color = JELLY_COLORS[rand() % NUM_JELLY_COLORS];
             }
         }
@@ -614,11 +700,17 @@ void RenderASCIIQuarium(HDC memDC, ScreenData* data, int width, int height, cons
         // Turnaround / Wrap-around
         if (goingRight && f.x > cols + 15) {
             f.x = -15.0f;
-            f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
+            int minFishY = waveRow + 5;
+            int maxFishY = rows - 5;
+            if (maxFishY <= minFishY) maxFishY = minFishY + 1;
+            f.y = (float)(rand() % (maxFishY - minFishY + 1) + minFishY);
             f.color = FISH_COLORS[rand() % NUM_FISH_COLORS];
         } else if (!goingRight && f.x < -15.0f) {
             f.x = (float)(cols + 15);
-            f.y = (float)(rand() % (std::max)(5, rows - 16) + 9);
+            int minFishY = waveRow + 5;
+            int maxFishY = rows - 5;
+            if (maxFishY <= minFishY) maxFishY = minFishY + 1;
+            f.y = (float)(rand() % (maxFishY - minFishY + 1) + minFishY);
             f.color = FISH_COLORS[rand() % NUM_FISH_COLORS];
         }
 
