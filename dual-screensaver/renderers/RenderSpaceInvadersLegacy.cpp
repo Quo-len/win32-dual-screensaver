@@ -7,13 +7,12 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <cstdint>
 
-namespace SpaceInvaders {
+namespace SpaceInvadersLegacy {
 
 // ============================================================================
 // VIRTUAL ARCADE RESOLUTION & COLOR PALETTE
-// Authentic Retro Arcade Space Invaders & Galaga Simulation
+// Authentic 1978/1980s Retro Arcade Space Invaders / Galaga Simulation
 // Virtual height is fixed at 256; virtual width adapts dynamically to monitor
 // aspect ratio (e.g. 455x256 for 16:9) filling 100% of the screen with ZERO black bars.
 // ============================================================================
@@ -21,27 +20,14 @@ static constexpr int BASE_ARCADE_H = 256;
 static constexpr int MIN_ARCADE_W  = 256;
 static constexpr int MAX_ARCADE_W  = 640;
 
-// 32-bit ARGB Palette (Rich Arcade Neon & Metallic Palette matching Snake & Tetris)
-static constexpr uint32_t COL_BLACK          = 0xFF050508;
-static constexpr uint32_t COL_WHITE          = 0xFFFFFFFF;
-static constexpr uint32_t COL_GREEN          = 0xFF00FF00;
-static constexpr uint32_t COL_RED            = 0xFFFF2020;
-static constexpr uint32_t COL_CRIMSON        = 0xFFFF1744;
-static constexpr uint32_t COL_CYAN           = 0xFF00FFFF;
-static constexpr uint32_t COL_CYAN_NEON      = 0xFF00E5FF;
-static constexpr uint32_t COL_YELLOW         = 0xFFFFFF00;
-static constexpr uint32_t COL_GOLD           = 0xFFFFD700;
-static constexpr uint32_t COL_MAGENTA        = 0xFFE040FB;
-static constexpr uint32_t COL_PURPLE_DEEP    = 0xFFAA00FF;
-static constexpr uint32_t COL_GREEN_LIME     = 0xFF00FF66;
-static constexpr uint32_t COL_GREEN_EMERALD  = 0xFF00E676;
-static constexpr uint32_t COL_GREEN_DARK     = 0xFF008833;
-static constexpr uint32_t COL_GREEN_DEEP     = 0xFF005520;
-static constexpr uint32_t COL_GREEN_HIGHLIGHT= 0xFF69F0AE;
-static constexpr uint32_t COL_GRAY_LIGHT     = 0xFFB0B0C0;
-static constexpr uint32_t COL_GRAY_DARK      = 0xFF353545;
-static constexpr uint32_t COL_BORDER_OUTER   = 0xFF1C2848;
-static constexpr uint32_t COL_BORDER_INNER   = 0xFF00E5FF;
+// 32-bit ARGB Palette
+static constexpr uint32_t COL_BLACK     = 0xFF000000;
+static constexpr uint32_t COL_WHITE     = 0xFFFFFFFF;
+static constexpr uint32_t COL_GREEN     = 0xFF00FF00;
+static constexpr uint32_t COL_RED       = 0xFFFF2020;
+static constexpr uint32_t COL_CYAN      = 0xFF40E0D0;
+static constexpr uint32_t COL_YELLOW    = 0xFFFFFF00;
+static constexpr uint32_t COL_DIM_GREEN = 0xFF008000;
 
 // ============================================================================
 // RETRO 5x7 ARCADE BITMAP FONT
@@ -88,18 +74,15 @@ static const uint8_t* GetGlyph(char c) {
     case '<': { static const uint8_t g[7] = { 0x02, 0x04, 0x08, 0x10, 0x08, 0x04, 0x02 }; return g; }
     case '>': { static const uint8_t g[7] = { 0x08, 0x04, 0x02, 0x01, 0x02, 0x04, 0x08 }; return g; }
     case '-': { static const uint8_t g[7] = { 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00 }; return g; }
-    case ':': { static const uint8_t g[7] = { 0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x0C, 0x00 }; return g; }
+    case ':': { static const uint8_t g[7] = { 0x00, 0x04, 0x00, 0x00, 0x04, 0x00, 0x00 }; return g; }
     case '!': { static const uint8_t g[7] = { 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04 }; return g; }
     case '*': { static const uint8_t g[7] = { 0x00, 0x15, 0x0E, 0x1F, 0x0E, 0x15, 0x00 }; return g; }
-    case '+': { static const uint8_t g[7] = { 0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00 }; return g; }
-    case '/': { static const uint8_t g[7] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x00, 0x00 }; return g; }
-    case '.': { static const uint8_t g[7] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C }; return g; }
     default:  return GLYPH_BLANK;
     }
 }
 
 // ============================================================================
-// SPRITE DEFINITIONS (Pixel-accurate base geometry masks)
+// SPRITE DEFINITIONS (Pixel-accurate, 100% Symmetrical 1-bit Masks)
 // ============================================================================
 
 // 1. Squid (Row 0, 8x8)
@@ -108,13 +91,13 @@ static const uint8_t SPRITE_SQUID[2][8] = {
     { 0x18, 0x3C, 0x7E, 0xDB, 0xFF, 0x42, 0x24, 0x18 }  // Frame 1
 };
 
-// 2. Crab (Rows 1 & 2, 11x8)
+// 2. Crab (Rows 1 & 2, 11x8) - 11-bit mask (bits 10 down to 0)
 static const uint16_t SPRITE_CRAB[2][8] = {
     { 0x104, 0x088, 0x1FC, 0x376, 0x7FF, 0x5FD, 0x505, 0x0D8 }, // Frame 0
     { 0x104, 0x489, 0x5FD, 0x777, 0x7FF, 0x3FE, 0x104, 0x202 }  // Frame 1
 };
 
-// 3. Octopus (Rows 3 & 4, 12x8)
+// 3. Octopus (Rows 3 & 4, 12x8) - 12-bit mask (bits 11 down to 0)
 static const uint16_t SPRITE_OCTOPUS[2][8] = {
     { 0x0F0, 0x7FE, 0xFFF, 0xE67, 0xFFF, 0x198, 0x36C, 0xC03 }, // Frame 0
     { 0x0F0, 0x7FE, 0xFFF, 0xE67, 0xFFF, 0x30C, 0x666, 0x30C }  // Frame 1
@@ -195,21 +178,6 @@ struct Alien {
     int scoreVal = 10;
 };
 
-struct InvaderSparkle {
-    float x, y;
-    float vx, vy;
-    int life;
-    int maxLife;
-    uint32_t color;
-};
-
-struct InvaderPopup {
-    float x, y;
-    int score;
-    int timer;
-    uint32_t color;
-};
-
 struct InvadersState {
     bool initialized = false;
     uint64_t lastTick = 0;
@@ -217,7 +185,7 @@ struct InvadersState {
     int virtualW = 455;
     int virtualH = BASE_ARCADE_H;
 
-    // Background Stars (Galaga / Space style)
+    // Background Stars (Galaga style)
     std::vector<SpaceStar> stars;
 
     // Aliens Swarm
@@ -266,10 +234,6 @@ struct InvadersState {
     int alienExplodeY = -1;
     int alienExplodeTimer = 0;
 
-    // Particle Sparkles & Floating Score Popups (Snake & Tetris style)
-    std::vector<InvaderSparkle> sparkles;
-    std::vector<InvaderPopup> popups;
-
     // Score & Wave
     int score = 0;
     int highScore = 1880;
@@ -282,7 +246,7 @@ struct InvadersState {
 };
 
 // ============================================================================
-// BITMAP DRAWING HELPERS
+// BITMAP DRAWING HELPERS (Direct into Virtual Framebuffer)
 // ============================================================================
 
 static inline void PutPixel(InvadersState& s, int x, int y, uint32_t color) {
@@ -307,7 +271,7 @@ static void DrawText(InvadersState& s, int x, int y, const char* str, uint32_t c
     int curX = x;
     while (*str) {
         DrawChar(s, curX, y, *str, color);
-        curX += 6;
+        curX += 6; // 5 width + 1 spacing
         str++;
     }
 }
@@ -319,43 +283,6 @@ static void DrawHLine(InvadersState& s, int x1, int x2, int y, uint32_t color) {
     for (int x = start; x <= end; ++x) {
         s.fb[y * s.virtualW + x] = color;
     }
-}
-
-static void DrawVLine(InvadersState& s, int x, int y1, int y2, uint32_t color) {
-    if (x < 0 || x >= s.virtualW) return;
-    int start = (std::max)(0, (std::min)(y1, y2));
-    int end   = (std::min)(s.virtualH - 1, (std::max)(y1, y2));
-    for (int y = start; y <= end; ++y) {
-        s.fb[y * s.virtualW + x] = color;
-    }
-}
-
-// Double-Line Neon Arcade Borders (Snake & Tetris styling)
-static void DrawInvadersBorder(InvadersState& s) {
-    int x1 = 8;
-    int y1 = 26;
-    int x2 = s.virtualW - 9;
-    int y2 = 236;
-
-    // Outer double-line border (deep metallic blue)
-    DrawHLine(s, x1 + 2, x2 - 2, y1, COL_BORDER_OUTER);
-    DrawHLine(s, x1 + 2, x2 - 2, y2, COL_BORDER_OUTER);
-    DrawVLine(s, x1, y1 + 2, y2 - 2, COL_BORDER_OUTER);
-    DrawVLine(s, x2, y1 + 2, y2 - 2, COL_BORDER_OUTER);
-    PutPixel(s, x1 + 1, y1 + 1, COL_BORDER_OUTER);
-    PutPixel(s, x2 - 1, y1 + 1, COL_BORDER_OUTER);
-    PutPixel(s, x1 + 1, y2 - 1, COL_BORDER_OUTER);
-    PutPixel(s, x2 - 1, y2 - 1, COL_BORDER_OUTER);
-
-    // Inner bright neon border (electric cyan)
-    int ix1 = x1 + 2;
-    int iy1 = y1 + 2;
-    int ix2 = x2 - 2;
-    int iy2 = y2 - 2;
-    DrawHLine(s, ix1 + 1, ix2 - 1, iy1, COL_BORDER_INNER);
-    DrawHLine(s, ix1 + 1, ix2 - 1, iy2, COL_BORDER_INNER);
-    DrawVLine(s, ix1, iy1 + 1, iy2 - 1, COL_BORDER_INNER);
-    DrawVLine(s, ix2, iy1 + 1, iy2 - 1, COL_BORDER_INNER);
 }
 
 // Carve a circular explosion crater into a bunker
@@ -376,7 +303,7 @@ static void DamageBunker(Bunker& b, int hitX, int hitY, int radius) {
     }
 }
 
-// Reset 4 bunkers to pristine condition
+// Reset 4 bunkers to pristine condition, distributed evenly across virtual width
 static void ResetBunkers(InvadersState& s) {
     const int bunkerCount = 4;
     const int bunkerWidth = 22;
@@ -401,7 +328,7 @@ static void InitStars(InvadersState& s) {
     s.stars.clear();
     int count = s.virtualW / 6; // ~70-90 stars
     static const uint32_t starPalette[] = {
-        0xFFFFFFFF, 0xFF80D8FF, 0xFFFFE082, 0xFFFF80AB, 0xFFB9F6CA
+        0xFFFFFFFF, 0xFFA0C0FF, 0xFFFFE080, 0xFFFF9090, 0xFF90FFA0
     };
     for (int i = 0; i < count; ++i) {
         SpaceStar st;
@@ -417,9 +344,10 @@ static void InitStars(InvadersState& s) {
 // Reset alien fleet for new wave
 static void ResetFleet(InvadersState& s, bool fullReset) {
     s.aliveCount = 55;
-    const float fleetTotalW = (InvadersState::COLS - 1) * 16.0f + 12.0f;
+    // Center fleet horizontally across the virtual widescreen
+    const float fleetTotalW = (InvadersState::COLS - 1) * 16.0f + 12.0f; // ~172 px
     s.fleetX = (std::max)(20.0f, (s.virtualW - fleetTotalW) * 0.5f);
-    s.fleetY = (float)(52 + ((s.wave - 1) % 4) * 6);
+    s.fleetY = (float)(52 + ((s.wave - 1) % 4) * 6); // Each wave starts slightly lower
     s.fleetDir = 1.0f;
     s.animStep = 0;
     s.stepTimer = 0;
@@ -440,359 +368,184 @@ static void ResetFleet(InvadersState& s, bool fullReset) {
     s.laserActive = false;
     s.ufoActive = false;
     s.ufoSpawnTimer = rand() % 300 + 200;
-    s.sparkles.clear();
-    s.popups.clear();
 
     if (fullReset) {
         s.playerX = s.virtualW * 0.5f - 7.0f;
         s.playerTargetX = s.playerX;
         s.playerAlive = true;
         s.playerExplodeTimer = 0;
-        s.lives = 3;
-        s.score = 0;
-        s.wave = 1;
-        s.gameOverTimer = 0;
-        s.waveClearTimer = 0;
         ResetBunkers(s);
     }
 }
 
+// Full game reset
 static void ResetGame(InvadersState& s) {
+    if (s.score > s.highScore) s.highScore = s.score;
+    s.score = 0;
+    s.lives = 3;
+    s.wave = 1;
+    s.gameOverTimer = 0;
+    s.waveClearTimer = 0;
+    s.alienExplodeTimer = 0;
     InitStars(s);
     ResetFleet(s, true);
 }
 
 // ============================================================================
-// RICH MULTI-TONE SPRITE TEXTURE RENDERERS
-// ============================================================================
-
-// 1. Squid (Row 0, 8x8): Electric Magenta with luminous crest & cyan cyber-eyes
-static void DrawSquid(InvadersState& s, int ax, int ay, int animStep) {
-    const uint8_t* sprite = SPRITE_SQUID[animStep];
-    for (int dy = 0; dy < 8; ++dy) {
-        uint8_t rowBits = sprite[dy];
-        for (int dx = 0; dx < 8; ++dx) {
-            if ((rowBits >> (7 - dx)) & 1) {
-                uint32_t col;
-                if (dy <= 1) {
-                    col = (dx >= 2 && dx <= 5) ? 0xFFFF80AB : 0xFFE040FB;
-                } else if (dy == 2) {
-                    col = (dx == 3 || dx == 4) ? 0xFFFF80AB : 0xFFE040FB;
-                } else if (dy == 3) {
-                    col = 0xFFD500F9;
-                } else if (dy == 4) {
-                    col = (dx >= 2 && dx <= 5) ? 0xFFFF4081 : 0xFFD500F9;
-                } else {
-                    col = (dy == 7) ? 0xFFFF4081 : 0xFFAA00FF;
-                }
-                PutPixel(s, ax + dx + 2, ay + dy, col);
-            } else if (dy == 3 && (dx == 2 || dx == 5)) {
-                // Piercing glowing cyan cyber-eyes in eye sockets!
-                PutPixel(s, ax + dx + 2, ay + dy, 0xFF00E5FF);
-            }
-        }
-    }
-}
-
-// 2. Crab (Rows 1 & 2, 11x8): Ice Cyan with carapace highlight & glowing crimson eyes
-static void DrawCrab(InvadersState& s, int ax, int ay, int animStep) {
-    const uint16_t* sprite = SPRITE_CRAB[animStep];
-    for (int dy = 0; dy < 8; ++dy) {
-        uint16_t rowBits = sprite[dy];
-        for (int dx = 0; dx < 11; ++dx) {
-            if ((rowBits >> (10 - dx)) & 1) {
-                uint32_t col;
-                if (dy <= 1) {
-                    col = (dy == 0) ? 0xFFFFFFFF : 0xFF18FFFF;
-                } else if (dy == 2) {
-                    col = (dx >= 3 && dx <= 7) ? 0xFFE0F7FA : 0xFF00E5FF;
-                } else if (dy == 3) {
-                    col = 0xFF00E5FF;
-                } else if (dy == 4) {
-                    col = (dx >= 3 && dx <= 7) ? 0xFFE0F7FA : 0xFF00E5FF;
-                } else if (dy == 5) {
-                    col = 0xFF00B8D4;
-                } else {
-                    col = (dx == 0 || dx == 10 || dy == 7) ? 0xFF00E5FF : 0xFF0091EA;
-                }
-                PutPixel(s, ax + dx + 1, ay + dy, col);
-            } else if (dy == 3 && (dx == 3 || dx == 7)) {
-                // Piercing glowing crimson eyes!
-                PutPixel(s, ax + dx + 1, ay + dy, 0xFFFF1744);
-            }
-        }
-    }
-}
-
-// 3. Octopus (Rows 3 & 4, 12x8): Emerald Green with lime crest & amber eyes
-static void DrawOctopus(InvadersState& s, int ax, int ay, int animStep) {
-    const uint16_t* sprite = SPRITE_OCTOPUS[animStep];
-    for (int dy = 0; dy < 8; ++dy) {
-        uint16_t rowBits = sprite[dy];
-        for (int dx = 0; dx < 12; ++dx) {
-            if ((rowBits >> (11 - dx)) & 1) {
-                uint32_t col;
-                if (dy <= 1) {
-                    col = (dx >= 4 && dx <= 7) ? 0xFF69F0AE : 0xFF00E676;
-                } else if (dy == 2) {
-                    col = (dx >= 3 && dx <= 8) ? 0xFF69F0AE : 0xFF00E676;
-                } else if (dy == 3) {
-                    col = 0xFF00E676;
-                } else if (dy == 4) {
-                    col = (dx >= 3 && dx <= 8) ? 0xFF00FF66 : 0xFF00C853;
-                } else if (dy == 5) {
-                    col = 0xFF00A844;
-                } else {
-                    col = (dy == 7) ? 0xFF00FF66 : 0xFF008833;
-                }
-                PutPixel(s, ax + dx, ay + dy, col);
-            } else if (dy == 3 && (dx == 4 || dx == 7)) {
-                // Piercing golden amber eyes!
-                PutPixel(s, ax + dx, ay + dy, 0xFFFFD700);
-            }
-        }
-    }
-}
-
-// 4. Mystery UFO Saucer (16x7): Metallic Ruby Hull with cockpit glass & glowing amber windows
-static void DrawUFO(InvadersState& s, int ux, int uy) {
-    for (int r = 0; r < 7; ++r) {
-        uint16_t rowBits = SPRITE_UFO[r];
-        for (int c = 0; c < 16; ++c) {
-            if ((rowBits >> (15 - c)) & 1) {
-                uint32_t col;
-                if (r == 0) {
-                    col = (c >= 6 && c <= 9) ? 0xFFFFFFFF : 0xFF80DEEA;
-                } else if (r == 1) {
-                    col = 0xFF00ACC1;
-                } else if (r == 2) {
-                    col = (c >= 4 && c <= 11) ? 0xFFFF5252 : 0xFFFF1744;
-                } else if (r == 3) {
-                    col = 0xFFFF1744;
-                } else if (r == 4) {
-                    col = 0xFFFF1744;
-                } else if (r == 5) {
-                    col = 0xFFB71C1C;
-                } else {
-                    col = 0xFF00E5FF; // Thruster plasma
-                }
-                PutPixel(s, ux + c, uy + r, col);
-            } else if (r == 3 && (c == 3 || c == 6 || c == 9 || c == 12)) {
-                // Glowing amber window portholes!
-                PutPixel(s, ux + c, uy + r, 0xFFFFD700);
-            }
-        }
-    }
-}
-
-// 5. Player Cannon (15x8): High-Tech Emerald Armor with chrome nozzle & cyan energy core
-static void DrawPlayerCannon(InvadersState& s, int px, int py) {
-    for (int r = 0; r < 8; ++r) {
-        uint16_t rowBits = SPRITE_PLAYER[r];
-        for (int c = 0; c < 15; ++c) {
-            if ((rowBits >> (14 - c)) & 1) {
-                uint32_t col;
-                if (r == 0) {
-                    col = 0xFFFFFFFF; // Polished chrome nozzle
-                } else if (r <= 2) {
-                    col = (c == 7) ? 0xFF00E5FF : 0xFF00E676; // Cyan energy coil & barrel
-                } else if (r == 3) {
-                    col = (c >= 5 && c <= 9) ? 0xFF69F0AE : 0xFF00E676; // Mantle ridge
-                } else if (r <= 5) {
-                    if (r == 4 && (c == 6 || c == 7 || c == 8)) col = 0xFF00E5FF; // Sensor visor slit
-                    else if (r == 4) col = 0xFF00E676;
-                    else col = 0xFF00C853;
-                } else {
-                    // Treads & chassis
-                    if (r == 7 && (c == 1 || c == 4 || c == 10 || c == 13)) {
-                        col = 0xFFB0BEC5; // Steel tread rollers
-                    } else {
-                        col = 0xFF004D20;
-                    }
-                }
-                PutPixel(s, px + c, py + r, col);
-            }
-        }
-    }
-}
-
-// 6. Defensive Bunkers (22x16): High-tech composite armor plates with plasma burn craters
-static void DrawBunkers(InvadersState& s) {
-    for (const auto& b : s.bunkers) {
-        for (int r = 0; r < 16; ++r) {
-            for (int c = 0; c < 22; ++c) {
-                if (b.pixels[r][c]) {
-                    // Check if adjacent to damage crater
-                    bool nearDamage = false;
-                    if (r > 0 && !b.pixels[r - 1][c] && ((BUNKER_TEMPLATE[r - 1] >> (21 - c)) & 1)) nearDamage = true;
-                    if (r < 15 && !b.pixels[r + 1][c] && ((BUNKER_TEMPLATE[r + 1] >> (21 - c)) & 1)) nearDamage = true;
-                    if (c > 0 && !b.pixels[r][c - 1] && ((BUNKER_TEMPLATE[r] >> (21 - (c - 1))) & 1)) nearDamage = true;
-                    if (c < 21 && !b.pixels[r][c + 1] && ((BUNKER_TEMPLATE[r] >> (21 - (c + 1))) & 1)) nearDamage = true;
-
-                    uint32_t col;
-                    if (nearDamage) {
-                        col = ((c + r) % 2 == 0) ? 0xFFFF9100 : 0xFFFF5722; // Molten plasma scorch
-                    } else if (r == 0 || c == 0 || c == 21) {
-                        col = 0xFF00FF66; // Outer neon shield rim
-                    } else if ((c + r) % 4 == 0) {
-                        col = 0xFF69F0AE; // Micro-plate bevel highlight
-                    } else if ((c * r) % 3 == 0) {
-                        col = 0xFF00C853; // High-density composite plate
-                    } else {
-                        col = 0xFF00A844;
-                    }
-                    PutPixel(s, b.x + c, b.y + r, col);
-                }
-            }
-        }
-    }
-}
-
-// 7. Player High-Energy Laser Beam
-static void DrawLaser(InvadersState& s, int lx, int ly) {
-    PutPixel(s, lx - 1, ly,     0xFF00E5FF);
-    PutPixel(s, lx,     ly,     0xFFFFFFFF);
-    PutPixel(s, lx + 1, ly,     0xFF00E5FF);
-
-    PutPixel(s, lx - 1, ly + 1, 0xFF00E5FF);
-    PutPixel(s, lx,     ly + 1, 0xFFFFFFFF);
-    PutPixel(s, lx + 1, ly + 1, 0xFF00E5FF);
-
-    PutPixel(s, lx,     ly + 2, 0xFFFFFFFF);
-    PutPixel(s, lx,     ly + 3, 0xFFFFFFFF);
-    PutPixel(s, lx,     ly + 4, 0xFF00E5FF);
-}
-
-// 8. Alien Bombs (Electric Lightning & Fiery Plasma)
-static void DrawBombs(InvadersState& s) {
-    for (const auto& b : s.bombs) {
-        int bx = (int)b.x;
-        int by = (int)b.y;
-        if (b.type == 0) {
-            // Rolling lightning bomb (Electric yellow & white)
-            int offset = (b.animFrame % 2 == 0) ? 0 : 1;
-            PutPixel(s, bx - offset, by,     0xFFFFFFFF);
-            PutPixel(s, bx + offset, by + 1, 0xFFFFEA00);
-            PutPixel(s, bx - offset, by + 2, 0xFFFFD700);
-            PutPixel(s, bx + offset, by + 3, 0xFFFF9100);
-        } else {
-            // Plunger plasma bomb (Crimson & Orange)
-            PutPixel(s, bx,     by,     0xFFFFFFFF);
-            PutPixel(s, bx,     by + 1, 0xFFFF5252);
-            PutPixel(s, bx,     by + 2, 0xFFFF1744);
-            PutPixel(s, bx - 1, by + 3, 0xFFFF9100);
-            PutPixel(s, bx + 1, by + 3, 0xFFFF9100);
-        }
-    }
-}
-
-// ============================================================================
-// SIMULATION & AI AUTOPILOT
+// AUTONOMOUS AI CONTROLLER (Self-Playing Agent)
 // ============================================================================
 
 static void UpdatePlayerAI(InvadersState& s) {
     if (!s.playerAlive) return;
 
-    // 1. Threat Detection: Incoming alien bombs
-    float dangerBombX = -1.0f;
-    float closestDist = 9999.0f;
-    for (const auto& b : s.bombs) {
-        if (b.y > 150.0f && b.y < 222.0f) {
-            float dist = fabsf(b.x - (s.playerX + 7.5f));
-            if (dist < 22.0f && (222.0f - b.y) < closestDist) {
-                closestDist = 222.0f - b.y;
-                dangerBombX = b.x;
+    const float cannonW = 15.0f;
+    float bestX = s.playerX;
+    float safestCost = 999999.0f;
+    const float minX = 12.0f;
+    const float maxX = (float)(s.virtualW - 27);
+
+    // 1. Scan candidate positions across playfield (step by 3 pixels)
+    for (float candX = minX; candX <= maxX; candX += 3.0f) {
+        float candCenter = candX + cannonW * 0.5f;
+        float cost = 0.0f;
+
+        // A. Bomb Danger Avoidance (Heavily penalize positions under falling bombs)
+        for (const auto& b : s.bombs) {
+            if (!b.active) continue;
+
+            float distY = 216.0f - b.y; // distance from ground
+            if (distY > 0 && distY < 120.0f) {
+                float distX = std::abs(candCenter - b.x);
+                if (distX < 15.0f) {
+                    // Check if sheltered by an intact bunker
+                    bool sheltered = false;
+                    for (const auto& bk : s.bunkers) {
+                        if (b.x >= bk.x && b.x < bk.x + 22 && b.y < bk.y) {
+                            int localX = (int)(b.x - bk.x);
+                            for (int r = 0; r < 6; ++r) {
+                                if (bk.pixels[r][localX]) {
+                                    sheltered = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!sheltered) {
+                        // Severe danger penalty: closer bomb = exponential danger
+                        cost += (120.0f - distY) * (15.0f - distX) * 50.0f;
+                    } else {
+                        // Safe behind shield, slight penalty only
+                        cost += 8.0f;
+                    }
+                }
             }
         }
-    }
 
-    // 2. Decide movement
-    if (dangerBombX >= 0.0f) {
-        if (s.playerX + 7.5f < dangerBombX) {
-            s.playerTargetX = dangerBombX - 22.0f;
-        } else {
-            s.playerTargetX = dangerBombX + 22.0f;
-        }
-    } else {
-        // Target high-priority UFO or lowest alien
+        // B. Target Alignment Bonus (Target lowest aliens or UFO)
         if (s.ufoActive) {
-            s.playerTargetX = s.ufoX;
+            // UFO is high-value target!
+            float ufoCenter = s.ufoX + 8.0f;
+            float diff = std::abs(candCenter - ufoCenter);
+            cost += diff * 1.5f;
         } else {
-            int bestCol = -1;
+            // Find lowest alive alien column
+            float bestColX = -1.0f;
             int lowestRow = -1;
+
             for (int c = 0; c < InvadersState::COLS; ++c) {
                 for (int r = InvadersState::ROWS - 1; r >= 0; --r) {
                     if (s.aliens[r][c].alive) {
                         if (r > lowestRow) {
                             lowestRow = r;
-                            bestCol = c;
+                            bestColX = s.fleetX + c * 16.0f + 6.0f;
                         }
                         break;
                     }
                 }
             }
-            if (bestCol >= 0) {
-                s.playerTargetX = s.fleetX + bestCol * 16.0f;
+
+            if (bestColX >= 0) {
+                float diff = std::abs(candCenter - bestColX);
+                cost += diff * 1.0f;
             }
         }
+
+        // C. Inertia penalty: prefer small smooth movements rather than jitter
+        cost += std::abs(candX - s.playerX) * 0.15f;
+
+        if (cost < safestCost) {
+            safestCost = cost;
+            bestX = candX;
+        }
+    }
+
+    s.playerTargetX = bestX;
+
+    // Smooth movement towards target
+    float dx = s.playerTargetX - s.playerX;
+    float speed = 2.0f;
+    if (std::abs(dx) <= speed) {
+        s.playerX = s.playerTargetX;
+    } else {
+        s.playerX += (dx > 0 ? speed : -speed);
     }
 
     // Clamp player bounds
-    const float minX = 14.0f;
-    const float maxX = (float)(s.virtualW - 30);
-    if (s.playerTargetX < minX) s.playerTargetX = minX;
-    if (s.playerTargetX > maxX) s.playerTargetX = maxX;
+    if (s.playerX < minX) s.playerX = minX;
+    if (s.playerX > maxX) s.playerX = maxX;
 
-    // Smooth movement
-    float dx = s.playerTargetX - s.playerX;
-    float speed = 2.4f;
-    if (fabsf(dx) <= speed) {
-        s.playerX = s.playerTargetX;
-    } else {
-        s.playerX += (dx > 0 ? 1.0f : -1.0f) * speed;
-    }
-
-    // 3. Autonomous Firing
+    // 2. Autonomous Opportunistic Shooting
     if (!s.laserActive) {
-        bool alignAlien = false;
-        for (int c = 0; c < InvadersState::COLS; ++c) {
-            float colX = s.fleetX + c * 16.0f + 6.0f;
-            if (fabsf((s.playerX + 7.0f) - colX) < 8.0f) {
-                for (int r = 0; r < InvadersState::ROWS; ++r) {
-                    if (s.aliens[r][c].alive) {
-                        alignAlien = true;
-                        break;
+        float cannonCenter = s.playerX + 7.0f;
+        bool shouldShoot = false;
+
+        if (s.ufoActive && std::abs(cannonCenter - (s.ufoX + 8.0f)) < 8.0f) {
+            shouldShoot = true;
+        } else {
+            // Check if aligned with an alive alien column
+            for (int c = 0; c < InvadersState::COLS; ++c) {
+                float colCenter = s.fleetX + c * 16.0f + 6.0f;
+                if (std::abs(cannonCenter - colCenter) < 6.0f) {
+                    for (int r = 0; r < InvadersState::ROWS; ++r) {
+                        if (s.aliens[r][c].alive) {
+                            shouldShoot = true;
+                            break;
+                        }
                     }
+                    if (shouldShoot) break;
                 }
-                if (alignAlien) break;
             }
         }
 
-        bool alignUFO = (s.ufoActive && fabsf((s.playerX + 7.0f) - (s.ufoX + 8.0f)) < 12.0f);
-
-        if (alignAlien || alignUFO || (rand() % 40 == 0)) {
+        // Fire missile!
+        if (shouldShoot || (rand() % 35 == 0)) {
             s.laserActive = true;
-            s.laserX = s.playerX + 7.0f;
+            s.laserX = cannonCenter;
             s.laserY = 212.0f;
         }
     }
 }
 
+// ============================================================================
+// SIMULATION UPDATE
+// ============================================================================
+
 static void UpdateSpaceInvaders(InvadersState& s) {
-    // 1. Victory / Game Over Pause Timers
+    // 1. Handle Game Over or Wave Clear pauses
+    if (s.gameOverTimer > 0) {
+        s.gameOverTimer--;
+        if (s.gameOverTimer == 0) {
+            ResetGame(s);
+        }
+        return;
+    }
+
     if (s.waveClearTimer > 0) {
         s.waveClearTimer--;
         if (s.waveClearTimer == 0) {
             s.wave++;
             ResetFleet(s, false);
-        }
-        return;
-    }
-
-    if (s.gameOverTimer > 0) {
-        s.gameOverTimer--;
-        if (s.gameOverTimer == 0) {
-            ResetGame(s);
         }
         return;
     }
@@ -803,7 +556,7 @@ static void UpdateSpaceInvaders(InvadersState& s) {
         if (s.playerExplodeTimer <= 0) {
             s.lives--;
             if (s.lives <= 0) {
-                s.gameOverTimer = 100;
+                s.gameOverTimer = 100; // Show GAME OVER for ~3 seconds
             } else {
                 s.playerAlive = true;
                 s.playerX = s.virtualW * 0.5f - 7.0f;
@@ -854,26 +607,7 @@ static void UpdateSpaceInvaders(InvadersState& s) {
                             s.alienExplodeTimer = 6;
                             s.laserActive = false;
 
-                            // Radial particle explosion (matching alien theme)
-                            uint32_t pCol = (r == 0) ? COL_MAGENTA : ((r <= 2) ? COL_CYAN_NEON : COL_GREEN_EMERALD);
-                            for (int p = 0; p < 8; ++p) {
-                                float angle = (float)p * (6.2831853f / 8.0f);
-                                float speed = 0.8f + (float)(rand() % 100) / 100.0f * 1.5f;
-                                s.sparkles.push_back({
-                                    ax + 6.0f, ay + 4.0f,
-                                    cosf(angle) * speed, sinf(angle) * speed,
-                                    0, 16 + rand() % 8,
-                                    (p % 2 == 0) ? pCol : COL_WHITE
-                                });
-                            }
-
-                            // Floating score popup (+10, +20, +30)
-                            s.popups.push_back({
-                                ax, ay - 2.0f,
-                                s.aliens[r][c].scoreVal, 0,
-                                pCol
-                            });
-
+                            // Accelerate fleet as aliens are destroyed
                             s.stepInterval = (std::max)(1, (s.aliveCount * 26) / 55 + 2);
                             break;
                         }
@@ -898,28 +632,11 @@ static void UpdateSpaceInvaders(InvadersState& s) {
                 s.ufoScoreTimer = 35;
                 s.ufoScoreX = s.ufoX;
                 s.ufoSpawnTimer = rand() % 400 + 300;
-
-                // Golden starburst explosion!
-                for (int p = 0; p < 14; ++p) {
-                    float angle = (float)p * (6.2831853f / 14.0f);
-                    float speed = 1.0f + (float)(rand() % 100) / 100.0f * 2.0f;
-                    s.sparkles.push_back({
-                        s.ufoX + 8.0f, s.ufoY + 4.0f,
-                        cosf(angle) * speed, sinf(angle) * speed,
-                        0, 22 + rand() % 10,
-                        (p % 3 == 0) ? COL_GOLD : ((p % 3 == 1) ? COL_CRIMSON : COL_WHITE)
-                    });
-                }
-                s.popups.push_back({
-                    s.ufoX, s.ufoY - 2.0f,
-                    award, 0,
-                    COL_GOLD
-                });
             }
         }
 
         // Offscreen top
-        if (s.laserY < 30.0f) {
+        if (s.laserY < 32.0f) {
             s.laserActive = false;
         }
     }
@@ -928,8 +645,9 @@ static void UpdateSpaceInvaders(InvadersState& s) {
     s.stepTimer++;
     if (s.stepTimer >= s.stepInterval) {
         s.stepTimer = 0;
-        s.animStep = 1 - s.animStep;
+        s.animStep = 1 - s.animStep; // Toggle walk frame
 
+        // Check fleet bounds across virtual widescreen
         float minAlienX = 9999.0f;
         float maxAlienX = -9999.0f;
         float maxAlienY = 0.0f;
@@ -947,16 +665,18 @@ static void UpdateSpaceInvaders(InvadersState& s) {
         }
 
         if (s.aliveCount == 0) {
-            s.waveClearTimer = 60;
+            s.waveClearTimer = 60; // 2 seconds victory pause
             return;
         }
 
-        const float rightBoundary = (float)(s.virtualW - 20);
-        const float leftBoundary  = 20.0f;
+        // Drop down & reverse when hitting edge of screen
+        const float rightBoundary = (float)(s.virtualW - 14);
+        const float leftBoundary  = 14.0f;
         if ((s.fleetDir > 0 && maxAlienX >= rightBoundary) || (s.fleetDir < 0 && minAlienX <= leftBoundary)) {
             s.fleetDir = -s.fleetDir;
             s.fleetY += 8.0f;
 
+            // Invaders reach bunker/cannon level = Instant game over
             if (maxAlienY >= 200.0f) {
                 s.playerAlive = false;
                 s.playerExplodeTimer = 40;
@@ -973,6 +693,7 @@ static void UpdateSpaceInvaders(InvadersState& s) {
     s.bombTimer++;
     if (s.bombTimer >= 20 && s.bombs.size() < 5) {
         s.bombTimer = 0;
+        // Find columns with alive aliens
         std::vector<int> aliveCols;
         for (int c = 0; c < InvadersState::COLS; ++c) {
             for (int r = 0; r < InvadersState::ROWS; ++r) {
@@ -985,13 +706,14 @@ static void UpdateSpaceInvaders(InvadersState& s) {
 
         if (!aliveCols.empty()) {
             int pickCol = aliveCols[rand() % aliveCols.size()];
+            // Find lowest alien in this column
             for (int r = InvadersState::ROWS - 1; r >= 0; --r) {
                 if (s.aliens[r][pickCol].alive) {
                     Bomb b;
                     b.x = s.fleetX + pickCol * 16.0f + 5.0f;
                     b.y = s.fleetY + r * 14.0f + 8.0f;
                     b.vy = 1.6f + (s.wave - 1) * 0.15f;
-                    b.type = rand() % 2;
+                    b.type = rand() % 3;
                     b.active = true;
                     s.bombs.push_back(b);
                     break;
@@ -1031,8 +753,8 @@ static void UpdateSpaceInvaders(InvadersState& s) {
             }
         }
 
-        // Ground collision
-        if (!destroyed && b.y >= 234.0f) {
+        // Offscreen bottom
+        if (b.y >= 236.0f) {
             destroyed = true;
         }
 
@@ -1043,63 +765,38 @@ static void UpdateSpaceInvaders(InvadersState& s) {
         }
     }
 
-    // 8. Update Mystery Flying Saucer (UFO)
+    // 8. Mystery UFO Saucer Logic
     if (!s.ufoActive) {
         s.ufoSpawnTimer--;
         if (s.ufoSpawnTimer <= 0) {
             s.ufoActive = true;
-            s.ufoSpeed = (rand() % 2 == 0) ? 1.0f : -1.0f;
+            s.ufoSpeed = (rand() % 2 == 0) ? 1.2f : -1.2f;
             s.ufoX = (s.ufoSpeed > 0) ? -16.0f : (float)s.virtualW;
-            s.ufoY = 32.0f;
         }
     } else {
         s.ufoX += s.ufoSpeed;
-        if (s.ufoSpeed > 0 && s.ufoX > (float)s.virtualW) {
+        if (s.ufoSpeed > 0 && s.ufoX > s.virtualW + 10) {
             s.ufoActive = false;
-            s.ufoSpawnTimer = rand() % 400 + 300;
-        } else if (s.ufoSpeed < 0 && s.ufoX < -20.0f) {
+            s.ufoSpawnTimer = rand() % 400 + 350;
+        } else if (s.ufoSpeed < 0 && s.ufoX < -20) {
             s.ufoActive = false;
-            s.ufoSpawnTimer = rand() % 400 + 300;
+            s.ufoSpawnTimer = rand() % 400 + 350;
         }
     }
 
     if (s.ufoScoreTimer > 0) s.ufoScoreTimer--;
     if (s.alienExplodeTimer > 0) s.alienExplodeTimer--;
-
-    // 9. Update Particle Sparkles & Floating Popups
-    for (size_t i = 0; i < s.sparkles.size(); ) {
-        s.sparkles[i].x += s.sparkles[i].vx;
-        s.sparkles[i].y += s.sparkles[i].vy;
-        s.sparkles[i].life++;
-        if (s.sparkles[i].life >= s.sparkles[i].maxLife) {
-            s.sparkles.erase(s.sparkles.begin() + i);
-        } else {
-            ++i;
-        }
-    }
-    for (size_t i = 0; i < s.popups.size(); ) {
-        s.popups[i].y -= 0.35f;
-        s.popups[i].timer++;
-        if (s.popups[i].timer >= 32) {
-            s.popups.erase(s.popups.begin() + i);
-        } else {
-            ++i;
-        }
-    }
 }
 
 // ============================================================================
-// COMPLETE ARCADE FRAME RENDERING
+// RENDER COMPONENT
 // ============================================================================
 
 static void RenderArcadeFrame(InvadersState& s) {
-    // 1. Clear Framebuffer to Obsidian Black
+    // 0. Clear Framebuffer to Pure Black
     std::fill(s.fb.begin(), s.fb.end(), COL_BLACK);
 
-    // 2. Playfield Arena Double-Line Neon Borders
-    DrawInvadersBorder(s);
-
-    // 3. Twinkling Deep Cosmic Starfield (Galaga style)
+    // 1. Draw Twinkling Background Starfield (Galaga style)
     for (auto& st : s.stars) {
         st.y += st.speed;
         if (st.y >= (float)s.virtualH) {
@@ -1111,16 +808,38 @@ static void RenderArcadeFrame(InvadersState& s) {
         PutPixel(s, (int)st.x, (int)st.y, col);
     }
 
-    // 4. Mystery UFO
+    // 2. Top HUD Header: "SCORE<1>   HI-SCORE   SCORE<2>"
+    DrawText(s, 16, 10, "SCORE<1>", COL_WHITE);
+    DrawText(s, s.virtualW / 2 - 24, 10, "HI-SCORE", COL_WHITE);
+    DrawText(s, s.virtualW - 68, 10, "SCORE<2>", COL_WHITE);
+
+    // Score Values
+    char scoreBuf[16];
+    sprintf_s(scoreBuf, "%04d", s.score);
+    DrawText(s, 28, 22, scoreBuf, COL_WHITE);
+
+    sprintf_s(scoreBuf, "%04d", s.highScore);
+    DrawText(s, s.virtualW / 2 - 12, 22, scoreBuf, COL_WHITE);
+
+    // 3. Mystery UFO (Red) or Bonus Score
     if (s.ufoActive) {
-        DrawUFO(s, (int)s.ufoX, (int)s.ufoY);
+        int ux = (int)s.ufoX;
+        int uy = (int)s.ufoY;
+        for (int r = 0; r < 7; ++r) {
+            uint16_t rowBits = SPRITE_UFO[r];
+            for (int c = 0; c < 16; ++c) {
+                if ((rowBits >> (15 - c)) & 1) {
+                    PutPixel(s, ux + c, uy + r, COL_RED);
+                }
+            }
+        }
     } else if (s.ufoScoreTimer > 0) {
         char ufoBuf[8];
         sprintf_s(ufoBuf, "%d", s.ufoScoreDisplay);
-        DrawText(s, (int)s.ufoScoreX, (int)s.ufoY, ufoBuf, COL_GOLD);
+        DrawText(s, (int)s.ufoScoreX, (int)s.ufoY, ufoBuf, COL_RED);
     }
 
-    // 5. Alien Invaders Grid with Rich Multi-Tone Textures
+    // 4. Alien Invaders Grid (Symmetrical, pixel-perfect)
     for (int r = 0; r < InvadersState::ROWS; ++r) {
         for (int c = 0; c < InvadersState::COLS; ++c) {
             if (s.aliens[r][c].alive) {
@@ -1128,11 +847,38 @@ static void RenderArcadeFrame(InvadersState& s) {
                 int ay = (int)(s.fleetY + r * 14.0f);
 
                 if (r == 0) {
-                    DrawSquid(s, ax, ay, s.animStep);
+                    // Squid (8x8, White, centered at offset + 2)
+                    const uint8_t* sprite = SPRITE_SQUID[s.animStep];
+                    for (int dy = 0; dy < 8; ++dy) {
+                        uint8_t rowBits = sprite[dy];
+                        for (int dx = 0; dx < 8; ++dx) {
+                            if ((rowBits >> (7 - dx)) & 1) {
+                                PutPixel(s, ax + dx + 2, ay + dy, COL_WHITE);
+                            }
+                        }
+                    }
                 } else if (r <= 2) {
-                    DrawCrab(s, ax, ay, s.animStep);
+                    // Crab (11x8, White, centered at offset + 1)
+                    const uint16_t* sprite = SPRITE_CRAB[s.animStep];
+                    for (int dy = 0; dy < 8; ++dy) {
+                        uint16_t rowBits = sprite[dy];
+                        for (int dx = 0; dx < 11; ++dx) {
+                            if ((rowBits >> (10 - dx)) & 1) {
+                                PutPixel(s, ax + dx + 1, ay + dy, COL_WHITE);
+                            }
+                        }
+                    }
                 } else {
-                    DrawOctopus(s, ax, ay, s.animStep);
+                    // Octopus (12x8, White, centered at offset + 0)
+                    const uint16_t* sprite = SPRITE_OCTOPUS[s.animStep];
+                    for (int dy = 0; dy < 8; ++dy) {
+                        uint16_t rowBits = sprite[dy];
+                        for (int dx = 0; dx < 12; ++dx) {
+                            if ((rowBits >> (11 - dx)) & 1) {
+                                PutPixel(s, ax + dx, ay + dy, COL_WHITE);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1150,12 +896,29 @@ static void RenderArcadeFrame(InvadersState& s) {
         }
     }
 
-    // 6. Defensive Bunkers (High-Tech Composite Armor Plates)
-    DrawBunkers(s);
+    // 5. Bunkers / Defense Shields (Green, Destructible)
+    for (const auto& b : s.bunkers) {
+        for (int r = 0; r < 16; ++r) {
+            for (int c = 0; c < 22; ++c) {
+                if (b.pixels[r][c]) {
+                    PutPixel(s, b.x + c, b.y + r, COL_GREEN);
+                }
+            }
+        }
+    }
 
-    // 7. Player Cannon (Rich Emerald Armor) or Explosion
+    // 6. Player Cannon (Green) or Death Explosion
     if (s.playerAlive) {
-        DrawPlayerCannon(s, (int)s.playerX, 216);
+        int px = (int)s.playerX;
+        int py = 216;
+        for (int r = 0; r < 8; ++r) {
+            uint16_t rowBits = SPRITE_PLAYER[r];
+            for (int c = 0; c < 15; ++c) {
+                if ((rowBits >> (14 - c)) & 1) {
+                    PutPixel(s, px + c, py + r, COL_GREEN);
+                }
+            }
+        }
     } else if (s.playerExplodeTimer > 0) {
         int px = (int)s.playerX;
         int py = 216;
@@ -1165,73 +928,73 @@ static void RenderArcadeFrame(InvadersState& s) {
             uint16_t rowBits = sprite[r];
             for (int c = 0; c < 15; ++c) {
                 if ((rowBits >> (14 - c)) & 1) {
-                    uint32_t col = (c % 2 == 0) ? COL_CRIMSON : COL_GOLD;
-                    PutPixel(s, px + c, py + r, col);
+                    PutPixel(s, px + c, py + r, COL_GREEN);
                 }
             }
         }
     }
 
-    // 8. Player High-Energy Laser Beam
+    // 7. Player Laser Beam (White)
     if (s.laserActive) {
-        DrawLaser(s, (int)s.laserX, (int)s.laserY);
+        int lx = (int)s.laserX;
+        int ly = (int)s.laserY;
+        PutPixel(s, lx, ly,     COL_WHITE);
+        PutPixel(s, lx, ly + 1, COL_WHITE);
+        PutPixel(s, lx, ly + 2, COL_WHITE);
+        PutPixel(s, lx, ly + 3, COL_WHITE);
     }
 
-    // 9. Alien Bombs
-    DrawBombs(s);
-
-    // 10. Particle Sparkles
-    for (const auto& sp : s.sparkles) {
-        PutPixel(s, (int)sp.x, (int)sp.y, sp.color);
+    // 8. Alien Bombs (White, Animated)
+    for (const auto& b : s.bombs) {
+        int bx = (int)b.x;
+        int by = (int)b.y;
+        if (b.type == 0) {
+            // Rolling bomb
+            int offset = (b.animFrame % 2 == 0) ? 0 : 1;
+            PutPixel(s, bx - offset, by,     COL_WHITE);
+            PutPixel(s, bx + offset, by + 1, COL_WHITE);
+            PutPixel(s, bx - offset, by + 2, COL_WHITE);
+            PutPixel(s, bx + offset, by + 3, COL_WHITE);
+        } else {
+            // Plunger bomb
+            PutPixel(s, bx, by,     COL_WHITE);
+            PutPixel(s, bx, by + 1, COL_WHITE);
+            PutPixel(s, bx, by + 2, COL_WHITE);
+            PutPixel(s, bx - 1, by + 3, COL_WHITE);
+            PutPixel(s, bx + 1, by + 3, COL_WHITE);
+        }
     }
 
-    // 11. Floating Score Popups (+10, +20, +30, +100, +300)
-    for (const auto& pop : s.popups) {
-        char buf[16];
-        sprintf_s(buf, "+%d", pop.score);
-        DrawText(s, (int)pop.x, (int)pop.y, buf, pop.color);
-    }
+    // 9. Ground Baseline (Green horizontal line spanning entire widescreen at Y = 236)
+    DrawHLine(s, 0, s.virtualW - 1, 236, COL_GREEN);
 
-    // 12. Top HUD (Snake & Tetris styling)
-    int playLeft = 14;
-    DrawText(s, playLeft, 4, "SCORE", COL_WHITE);
-    char scoreBuf[16];
-    sprintf_s(scoreBuf, "%06d", s.score);
-    DrawText(s, playLeft, 13, scoreBuf, COL_WHITE);
-
-    int midX = s.virtualW / 2;
-    DrawText(s, midX - 27, 4, "HIGH SCORE", COL_CYAN_NEON);
-    char highBuf[16];
-    sprintf_s(highBuf, "%06d", s.highScore);
-    DrawText(s, midX - 18, 13, highBuf, COL_GOLD);
-
-    DrawText(s, s.virtualW - playLeft - 30, 4, "FLEET", COL_GRAY_LIGHT);
-    char fleetBuf[16];
-    sprintf_s(fleetBuf, "%02d/55", s.aliveCount);
-    int fleetW = (int)strlen(fleetBuf) * 6;
-    DrawText(s, s.virtualW - playLeft - fleetW, 13, fleetBuf, COL_GREEN_LIME);
-
-    // 13. Bottom Status Bar & Ground Baseline
-    DrawHLine(s, 0, s.virtualW - 1, 238, COL_GREEN_DARK);
+    // 10. Bottom Status Bar: Lives & Credit (Below Ground Line)
+    char livesBuf[8];
+    sprintf_s(livesBuf, "%d", s.lives);
+    DrawText(s, 16, 242, livesBuf, COL_WHITE);
 
     // Mini Cannon Icons for Remaining Lives
     for (int l = 0; l < (std::min)(5, s.lives - 1); ++l) {
-        DrawPlayerCannon(s, 20 + l * 18, 242);
+        int lx = 30 + l * 18;
+        int ly = 241;
+        for (int r = 0; r < 8; ++r) {
+            uint16_t rowBits = SPRITE_PLAYER[r];
+            for (int c = 0; c < 15; ++c) {
+                if ((rowBits >> (14 - c)) & 1) {
+                    PutPixel(s, lx + c, ly + r, COL_GREEN);
+                }
+            }
+        }
     }
 
-    // Round / Wave indicator in center
-    char roundBuf[16];
-    sprintf_s(roundBuf, "WAVE %02d", s.wave);
-    DrawText(s, midX - 21, 244, roundBuf, COL_WHITE);
+    // Credit Counter / Round Indicator (Right edge of widescreen)
+    char creditBuf[16];
+    sprintf_s(creditBuf, "CREDIT %02d", s.wave);
+    DrawText(s, s.virtualW - 74, 242, creditBuf, COL_WHITE);
 
-    // Defense Sector tag on right
-    DrawText(s, s.virtualW - 68, 244, "SECTOR 01", COL_GRAY_LIGHT);
-
-    // 14. Game State Banners
+    // 11. Game Over Banner (Centered)
     if (s.gameOverTimer > 0) {
         DrawText(s, s.virtualW / 2 - 27, 110, "GAME OVER", COL_RED);
-    } else if (s.waveClearTimer > 0) {
-        DrawText(s, s.virtualW / 2 - 36, 110, "STAGE CLEAR!", COL_GOLD);
     }
 }
 
@@ -1239,12 +1002,13 @@ static void RenderArcadeFrame(InvadersState& s) {
 // MAIN SCREENSAVER ENTRY POINT
 // ============================================================================
 
-void RenderSpaceInvaders(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+void RenderSpaceInvadersLegacy(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     if (width <= 0 || height <= 0) return;
 
-    auto& s = data->GetCustomState<InvadersState>(28);
+    auto& s = data->GetCustomState<InvadersState>(31);
 
     // Calculate virtual arcade resolution to match the display's exact aspect ratio
+    // Locking height to 256 for genuine retro scanline chunky pixel density
     int vH = BASE_ARCADE_H;
     int vW = (int)(256.0f * (float)width / (float)height);
     if (vW < MIN_ARCADE_W) vW = MIN_ARCADE_W;
@@ -1262,7 +1026,7 @@ void RenderSpaceInvaders(HDC memDC, ScreenData* data, int width, int height, con
     // Fixed-step simulation update (60 updates per second)
     uint64_t now = GetTickCount64();
     uint64_t elapsed = now - s.lastTick;
-    if (elapsed > 200) elapsed = 200;
+    if (elapsed > 200) elapsed = 200; // avoid spiral of death
     s.lastTick = now;
 
     int steps = (int)(elapsed / 16);
@@ -1276,7 +1040,7 @@ void RenderSpaceInvaders(HDC memDC, ScreenData* data, int width, int height, con
     // Render virtual arcade framebuffer
     RenderArcadeFrame(s);
 
-    // Fullscreen Pixel-Perfect Stretched Blit
+    // Fullscreen Pixel-Perfect Stretched Blit (Fills 100% of the screen, NO blank bars)
     BITMAPINFO bmi = { 0 };
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biWidth = s.virtualW;
@@ -1297,14 +1061,14 @@ void RenderSpaceInvaders(HDC memDC, ScreenData* data, int width, int height, con
     );
 }
 
-} // namespace SpaceInvaders
+} // namespace SpaceInvadersLegacy
 
-// Register as Screensaver ID 28
+// Register as Screensaver ID 31
 REGISTER_SCREENSAVER(
-    28,
-    L"Space Invaders",
-    "invaders",
-    { "invaders", "space", "galaga", "spaceinvaders" },
-    WRAP_LEGACY(SpaceInvaders::RenderSpaceInvaders),
+    31,
+    L"Space Invaders (Legacy)",
+    "invaders-legacy",
+    { "invaders-legacy", "space-legacy", "legacy-invaders", "space1978", "invaders1978" },
+    WRAP_LEGACY(SpaceInvadersLegacy::RenderSpaceInvadersLegacy),
     {}
 );
