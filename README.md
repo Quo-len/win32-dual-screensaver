@@ -72,6 +72,7 @@ just debug               # Build Debug (x64)
 just run                 # Launch screensaver in fullscreen (/s)
 just run 4k              # Launch screensaver in 4K resolution (/s /4k)
 just run <mode>          # Launch specific mode (e.g., just run matrix)
+just run 4k <mode>       # Launch specific mode in 4K (e.g., just run 4k bonsai)
 just modes               # List all available animation modes
 just bench               # Run headless benchmark at 1080p
 just bench 4k            # Run headless benchmark in 4K (3840x2160)
@@ -195,3 +196,10 @@ The screensaver executable supports standard Windows screensaver flags as well a
 
 - 📖 **[Main Project Guide](README.md)** — Core setup, installation, CLI flags, and build instructions.
 - 🎬 **[ASCII Video Converter Pipeline](scripts/README.md)** — Step-by-step guide to convert any video into an ASCII screensaver binary stream (`.bin`).
+
+---
+
+## Acknowledgments & Credits
+
+- 🌳 **[PyBonsai](https://github.com/Ben-Edwards44/PyBonsai)** by [Ben Edwards](https://github.com/Ben-Edwards44) — Procedural fractal bonsai generation algorithms and tree branching models (Classic, Fibonacci, Offset Fibonacci, and Random Offset Fibonacci) in the `cbonsai` screensaver.
+

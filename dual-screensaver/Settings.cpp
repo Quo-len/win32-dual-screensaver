@@ -40,8 +40,19 @@ void LoadSettings()
 		// Dynamically load all per-screensaver settings from registry
 		for (const auto& def : ScreensaverRegistry::GetAll()) {
 			for (const auto& item : def.settings) {
-				DWORD itemSize = (item.type == SettingType::Int) ? sizeof(int) : sizeof(float);
-				RegQueryValueExW(hKey, item.key, NULL, NULL, (LPBYTE)item.valPtr, &itemSize);
+				if (item.type == SettingType::Int) {
+					DWORD itemSize = sizeof(int);
+					RegQueryValueExW(hKey, item.key, NULL, NULL, (LPBYTE)item.valPtr, &itemSize);
+				} else if (item.type == SettingType::Float) {
+					DWORD itemSize = sizeof(float);
+					RegQueryValueExW(hKey, item.key, NULL, NULL, (LPBYTE)item.valPtr, &itemSize);
+				} else if (item.type == SettingType::Bool) {
+					int b = 0;
+					DWORD itemSize = sizeof(int);
+					if (RegQueryValueExW(hKey, item.key, NULL, NULL, (LPBYTE)&b, &itemSize) == ERROR_SUCCESS) {
+						*(bool*)item.valPtr = (b != 0);
+					}
+				}
 			}
 		}
 

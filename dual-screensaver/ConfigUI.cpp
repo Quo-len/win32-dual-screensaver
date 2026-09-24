@@ -1,8 +1,13 @@
 #include "ConfigUI.h"
 #include "Settings.h"
 #include "ScreensaverRegistry.h"
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
+#include <vector>
 
 extern HINSTANCE hInst;
 
@@ -10,6 +15,8 @@ extern HINSTANCE hInst;
 #define IDAPPLY_SUB 2300
 #define IDRESET_SUB 2301
 #define IDC_SUB_EDIT_BASE 3100
+#define IDC_SUB_HELP_BASE 3200
+#define IDC_SUB_LBL_BASE 3300
 
 bool HasSettings(int id) {
 	const auto* def = ScreensaverRegistry::GetById(id);
@@ -22,60 +29,190 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	{
 	case WM_CREATE:
 	{
+		INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX), ICC_WIN95_CLASSES | ICC_BAR_CLASSES };
+		InitCommonControlsEx(&icex);
+
 		CREATESTRUCT* pCreate = (CREATESTRUCT*)lParam;
 		int ss_id = (int)(INT_PTR)pCreate->lpCreateParams;
 		SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)ss_id);
 
+		auto* pTipStrings = new std::vector<std::wstring>();
+		pTipStrings->reserve(256);
+		SetPropW(hWnd, L"TooltipStrings", (HANDLE)pTipStrings);
+
+		HWND hTooltip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL,
+			WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+			hWnd, NULL, hInst, NULL);
+		SetWindowPos(hTooltip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		SendMessageW(hTooltip, TTM_ACTIVATE, TRUE, 0);
+		SendMessageW(hTooltip, TTM_SETDELAYTIME, TTDT_INITIAL, 100);
+		SendMessageW(hTooltip, TTM_SETDELAYTIME, TTDT_RESHOW, 100);
+		SendMessageW(hTooltip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 15000);
+		SendMessageW(hTooltip, TTM_SETMAXTIPWIDTH, 0, 280);
+
+		auto addTooltip = [&](HWND hTarget, const WCHAR* text) {
+			if (!hTarget || !hTooltip || !text || !text[0]) return;
+			pTipStrings->push_back(text);
+			TTTOOLINFOW ti = { 0 };
+			ti.cbSize = sizeof(TTTOOLINFOW);
+			ti.uFlags = TTF_SUBCLASS | TTF_IDISHWND;
+			ti.hwnd = hWnd;
+			ti.uId = (UINT_PTR)hTarget;
+			ti.lpszText = (LPWSTR)pTipStrings->back().c_str();
+			if (!SendMessageW(hTooltip, TTM_ADDTOOLW, 0, (LPARAM)&ti)) {
+				ti.cbSize = TTTOOLINFOW_V1_SIZE;
+				SendMessageW(hTooltip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
+			}
+		};
+
 		HFONT hFont = CreateFontW(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+		SetPropW(hWnd, L"SubFont", (HANDLE)hFont);
+
+		HFONT hHelpFont = CreateFontW(17, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+		SetPropW(hWnd, L"SubHelpFont", (HANDLE)hHelpFont);
 
 		int y = 20;
 		const int col1X = 20;
-		const int lblW = 120;
-		const int edtW = 140;
-		const int rowH = 40;
+		const int lblW = 160;
+		const int edtW = 75;
+		const int hintX = col1X + lblW + edtW + 10;
+		const int hintW = 115;
+		const int qX = hintX + hintW + 10;
+		const int qW = 24;
+		const int qH = 24;
+		const int rowH = 36;
 
-		auto createRow = [&](const WCHAR* label, int editId, const char* initialVal) {
-			HWND hLbl = CreateWindowW(L"STATIC", label, WS_CHILD | WS_VISIBLE, col1X, y, lblW, 25, hWnd, NULL, hInst, NULL);
-			HWND hEdt = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + lblW, y, edtW, 30, hWnd, (HMENU)(INT_PTR)editId, hInst, NULL);
+		auto createRow = [&](const WCHAR* label, int lblId, int editId, const char* initialVal, const WCHAR* rangeText, const WCHAR* fullTipText, bool hasDesc, int itemIdx) {
+			HWND hLbl = CreateWindowW(L"STATIC", label, WS_CHILD | WS_VISIBLE | SS_NOTIFY, col1X, y, lblW, 25, hWnd, (HMENU)(INT_PTR)lblId, hInst, NULL);
+			HWND hEdt = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, col1X + lblW, y, edtW, 28, hWnd, (HMENU)(INT_PTR)editId, hInst, NULL);
+			HWND hHint = CreateWindowW(L"STATIC", rangeText ? rangeText : L"", WS_CHILD | WS_VISIBLE | SS_NOTIFY, hintX, y + 3, hintW, 22, hWnd, NULL, hInst, NULL);
 			SendMessage(hLbl, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 			SendMessage(hEdt, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+			SendMessage(hHint, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 			SetWindowTextA(hEdt, initialVal);
+			if (fullTipText && fullTipText[0]) {
+				addTooltip(hLbl, fullTipText);
+				addTooltip(hEdt, fullTipText);
+				addTooltip(hHint, fullTipText);
+			}
+			if (hasDesc) {
+				HWND hQ = CreateWindowW(L"BUTTON", L"?", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+					qX, y + 2, qW, qH, hWnd, (HMENU)(INT_PTR)(IDC_SUB_HELP_BASE + itemIdx), hInst, NULL);
+				SendMessage(hQ, WM_SETFONT, (WPARAM)hHelpFont, MAKELPARAM(TRUE, 0));
+				if (fullTipText && fullTipText[0]) {
+					addTooltip(hQ, fullTipText);
+				}
+			}
 			y += rowH;
 		};
 
 		const auto* def = ScreensaverRegistry::GetById(ss_id);
 		if (def) {
 			int editId = IDC_SUB_EDIT_BASE;
+			int itemIdx = 0;
 			char buf[64];
 			for (const auto& item : def->settings) {
+				WCHAR rangeStr[64] = L"";
+
+				std::wstring desc = (item.description && item.description[0]) ? item.description : L"";
+				std::wstring fullTip = desc;
+				WCHAR limitsBuf[160];
 				if (item.type == SettingType::Int) {
-					sprintf_s(buf, "%d", *(int*)item.valPtr);
+					if (!fullTip.empty()) {
+						swprintf_s(limitsBuf, L"\n\nDefault: %d   Allowed: [%d .. %d]", (int)item.defVal, (int)item.minVal, (int)item.maxVal);
+					} else {
+						swprintf_s(limitsBuf, L"Allowed Min: %d\nAllowed Max: %d\nDefault: %d", (int)item.minVal, (int)item.maxVal, (int)item.defVal);
+					}
+					swprintf_s(rangeStr, L"[%d .. %d]", (int)item.minVal, (int)item.maxVal);
 				} else if (item.type == SettingType::Float) {
-					sprintf_s(buf, "%.*f", item.precision, *(float*)item.valPtr);
+					if (!fullTip.empty()) {
+						swprintf_s(limitsBuf, L"\n\nDefault: %.*f   Allowed: [%.*f .. %.*f]", item.precision, (float)item.defVal, item.precision, (float)item.minVal, item.precision, (float)item.maxVal);
+					} else {
+						swprintf_s(limitsBuf, L"Allowed Min: %.*f\nAllowed Max: %.*f\nDefault: %.*f",
+							item.precision, (float)item.minVal,
+							item.precision, (float)item.maxVal,
+							item.precision, (float)item.defVal);
+					}
+					swprintf_s(rangeStr, L"[%.*f .. %.*f]", item.precision, (float)item.minVal, item.precision, (float)item.maxVal);
 				} else if (item.type == SettingType::Bool) {
-					sprintf_s(buf, "%d", *(bool*)item.valPtr ? 1 : 0);
+					if (!fullTip.empty()) {
+						swprintf_s(limitsBuf, L"\n\nDefault: %s", (item.defVal != 0.0) ? L"Checked" : L"Unchecked");
+					} else {
+						swprintf_s(limitsBuf, L"Options: Checked (1) / Unchecked (0)\nDefault: %s",
+							(item.defVal != 0.0) ? L"Checked" : L"Unchecked");
+					}
 				}
-				createRow(item.label, editId++, buf);
+				fullTip += limitsBuf;
+
+				bool hasDesc = !desc.empty();
+
+				if (item.type == SettingType::Bool) {
+					int chkW = qX - col1X - 8;
+					HWND hChk = CreateWindowW(L"BUTTON", item.label, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
+						col1X, y, chkW, 25, hWnd, (HMENU)(INT_PTR)editId++, hInst, NULL);
+					SendMessage(hChk, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
+					SendMessage(hChk, BM_SETCHECK, *(bool*)item.valPtr ? BST_CHECKED : BST_UNCHECKED, 0);
+					if (!fullTip.empty()) {
+						addTooltip(hChk, fullTip.c_str());
+					}
+					if (hasDesc) {
+						HWND hQ = CreateWindowW(L"BUTTON", L"?", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+							qX, y, qW, qH, hWnd, (HMENU)(INT_PTR)(IDC_SUB_HELP_BASE + itemIdx), hInst, NULL);
+						SendMessage(hQ, WM_SETFONT, (WPARAM)hHelpFont, MAKELPARAM(TRUE, 0));
+						if (!fullTip.empty()) {
+							addTooltip(hQ, fullTip.c_str());
+						}
+					}
+					y += 30;
+				} else {
+					if (item.type == SettingType::Int) {
+						sprintf_s(buf, "%d", *(int*)item.valPtr);
+					} else if (item.type == SettingType::Float) {
+						sprintf_s(buf, "%.*f", item.precision, *(float*)item.valPtr);
+					}
+					createRow(item.label, IDC_SUB_LBL_BASE + itemIdx, editId++, buf, rangeStr, fullTip.c_str(), hasDesc, itemIdx);
+				}
+				itemIdx++;
 			}
 		}
 
-		y += 10;
+		y += 15;
+		int totalW = qX + qW + 20;
+		int btnW = 120;
+		int gap = 20;
+		int btnStartX = (totalW - (btnW * 2 + gap)) / 2;
+
 		HWND hReset = CreateWindowW(L"BUTTON", L"Defaults", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-			20, y, 120, 35, hWnd, (HMENU)IDRESET_SUB, hInst, NULL);
+			btnStartX, y, btnW, 35, hWnd, (HMENU)IDRESET_SUB, hInst, NULL);
 		HWND hApply = CreateWindowW(L"BUTTON", L"Apply", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-			155, y, 125, 35, hWnd, (HMENU)IDAPPLY_SUB, hInst, NULL);
+			btnStartX + btnW + gap, y, btnW, 35, hWnd, (HMENU)IDAPPLY_SUB, hInst, NULL);
 		SendMessage(hReset, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 		SendMessage(hApply, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
-		RECT rc = { 0, 0, col1X + lblW + edtW + 40, y + 60 };
+		RECT rc = { 0, 0, totalW, y + 55 };
 		AdjustWindowRectEx(&rc, WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_TOOLWINDOW);
 		SetWindowPos(hWnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
 
 		break;
 	}
+	case WM_SETCURSOR:
+	{
+		HWND hCtrl = (HWND)wParam;
+		int id = GetDlgCtrlID(hCtrl);
+		if ((id >= IDC_SUB_HELP_BASE && id < IDC_SUB_HELP_BASE + 200) ||
+			(id >= IDC_SUB_LBL_BASE && id < IDC_SUB_LBL_BASE + 200)) {
+			SetCursor(LoadCursor(NULL, IDC_HAND));
+			return TRUE;
+		}
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
 	case WM_COMMAND:
-		if (LOWORD(wParam) == IDAPPLY_SUB)
+	{
+		WORD cmdId = LOWORD(wParam);
+		if (cmdId == IDAPPLY_SUB)
 		{
 			int ss_id = (int)GetWindowLongPtr(hWnd, GWLP_USERDATA);
 			const auto* def = ScreensaverRegistry::GetById(ss_id);
@@ -83,19 +220,20 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				int editId = IDC_SUB_EDIT_BASE;
 				char buf[64];
 				for (const auto& item : def->settings) {
-					if (GetDlgItemTextA(hWnd, editId++, buf, sizeof(buf))) {
+					if (item.type == SettingType::Bool) {
+						*(bool*)item.valPtr = (SendMessage(GetDlgItem(hWnd, editId++), BM_GETCHECK, 0, 0) == BST_CHECKED);
+					} else if (GetDlgItemTextA(hWnd, editId++, buf, sizeof(buf))) {
 						double v = atof(buf);
 						if (v < item.minVal) v = item.minVal;
 						if (v > item.maxVal) v = item.maxVal;
 						if (item.type == SettingType::Int) *(int*)item.valPtr = (int)v;
 						else if (item.type == SettingType::Float) *(float*)item.valPtr = (float)v;
-						else if (item.type == SettingType::Bool) *(bool*)item.valPtr = (v != 0.0);
 					}
 				}
 				SaveSettings();
 			}
 		}
-		else if (LOWORD(wParam) == IDRESET_SUB)
+		else if (cmdId == IDRESET_SUB)
 		{
 			int ss_id = (int)GetWindowLongPtr(hWnd, GWLP_USERDATA);
 			const auto* def = ScreensaverRegistry::GetById(ss_id);
@@ -103,25 +241,46 @@ LRESULT CALLBACK SubSettingsProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				int editId = IDC_SUB_EDIT_BASE;
 				char buf[64];
 				for (const auto& item : def->settings) {
-					if (item.type == SettingType::Int) {
+					if (item.type == SettingType::Bool) {
+						*(bool*)item.valPtr = (item.defVal != 0.0);
+						SendMessage(GetDlgItem(hWnd, editId++), BM_SETCHECK, (item.defVal != 0.0) ? BST_CHECKED : BST_UNCHECKED, 0);
+					} else if (item.type == SettingType::Int) {
 						*(int*)item.valPtr = (int)item.defVal;
 						sprintf_s(buf, "%d", (int)item.defVal);
+						SetDlgItemTextA(hWnd, editId++, buf);
 					} else if (item.type == SettingType::Float) {
 						*(float*)item.valPtr = (float)item.defVal;
 						sprintf_s(buf, "%.*f", item.precision, (float)item.defVal);
-					} else if (item.type == SettingType::Bool) {
-						*(bool*)item.valPtr = (item.defVal != 0.0);
-						sprintf_s(buf, "%d", (item.defVal != 0.0) ? 1 : 0);
+						SetDlgItemTextA(hWnd, editId++, buf);
 					}
-					SetDlgItemTextA(hWnd, editId++, buf);
 				}
 				SaveSettings();
 			}
 		}
 		break;
+	}
 	case WM_CLOSE:
 		DestroyWindow(hWnd);
 		break;
+	case WM_DESTROY:
+	{
+		auto* pTipStrings = (std::vector<std::wstring>*)GetPropW(hWnd, L"TooltipStrings");
+		if (pTipStrings) {
+			delete pTipStrings;
+			RemovePropW(hWnd, L"TooltipStrings");
+		}
+		HFONT hFont = (HFONT)GetPropW(hWnd, L"SubFont");
+		if (hFont) {
+			DeleteObject(hFont);
+			RemovePropW(hWnd, L"SubFont");
+		}
+		HFONT hHelpFont = (HFONT)GetPropW(hWnd, L"SubHelpFont");
+		if (hHelpFont) {
+			DeleteObject(hHelpFont);
+			RemovePropW(hWnd, L"SubHelpFont");
+		}
+		break;
+	}
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
