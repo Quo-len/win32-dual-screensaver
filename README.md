@@ -1,22 +1,23 @@
 # Dual Screensaver
 
-A high-performance, native Win32 multi-monitor screensaver for Windows with 31 procedural and retro visual modes, per-monitor customization, and customizable randomizer pools.
+A high-performance, native Win32 C++20 multi-monitor screensaver engine for Windows featuring 37 procedural and retro arcade visual modes, 4K rendering with zero GPU overhead, per-monitor mode assignment, and customizable randomizer pools.
 
-> 📚 **Navigation**: [Features](#features) • [Visual Modes](#visual-modes-31-built-in) • [Installation](#installation-windows-built-in-screensaver) • [CLI & Hotkeys](#command-line-flags--controls) • [🎬 Video Converter Guide](scripts/README.md)
+> 📚 **Navigation**: [Features](#features) • [Visual Modes](#visual-modes-37-built-in) • [Installation](#installation-windows-built-in-screensaver) • [CLI & Hotkeys](#command-line-flags--controls) • [🎬 Video Converter Guide](scripts/README.md)
 
 ---
 
 ## Features
 
 - **Multi-Monitor Support**: Spans across all detected monitors seamlessly.
-- **Per-Monitor Mode Selection**: Assign different animations to your primary and secondary displays.
+- **Per-Monitor Mode Selection**: Assign different animations and seasonal themes to your primary and secondary displays.
 - **Randomizer with Custom Pool**: Automatically randomize modes on launch from a custom checklist of your favorite animations.
-- **Command-line Controls**: Full support for Windows screensaver standards (`/s`, `/c`, `/p`) and direct mode launches (e.g., `dual-screensaver.exe matrix earth`).
-- **Zero Heavy Dependencies**: Pure Win32 C++ and GDI with lightweight resource usage.
+- **Zero GPU Overhead & 4K Ready**: Lightweight software rasterization engine using Win32 GDI with downscaled 4K presentation support.
+- **Command-line Controls**: Full support for Windows screensaver standards (`/s`, `/c`, `/p`), 4K simulation (`just run 4k <mode>`), and direct mode launches (e.g., `dual-screensaver.exe matrix earth`).
+- **Zero Heavy Dependencies**: Pure Win32 C++20 and GDI with instant startup and minimal RAM usage (< 25 MB).
 
 ---
 
-## Visual Modes (31 Built-in)
+## Visual Modes (37 Built-in)
 
 | #   | Mode                     | Description                                                                |
 | --- | ------------------------ | -------------------------------------------------------------------------- |
@@ -51,6 +52,12 @@ A high-performance, native Win32 multi-monitor screensaver for Windows with 31 p
 | 28  | **Space Invaders**       | Autonomous arcade space defense with marching alien armada, bunkers & UFO  |
 | 29  | **Pac-Man**              | Autonomous arcade maze with authentic ghost AI personalities, fruit & energizer chase |
 | 30  | **Tetris**               | Self-playing arcade Tetris with Pierre Dellacherie heuristic AI & retro UI |
+| 31  | **Space Invaders (Legacy)** | Original retro raster alien defense with bunkers and flying saucer      |
+| 32  | **Pong (Legacy)**           | Minimalist classic 2-player arcade table tennis                         |
+| 33  | **Sorting Algorithms (Legacy)** | Traditional vertical bar-chart comparison of sorting algorithms     |
+| 34  | **Maze Generator (Legacy)** | Classic depth-first search labyrinth generation & traversal             |
+| 35  | **Arkanoid (Breakout Neon)** | Autonomous cyber breakout arcade with physics, neon glows & brick effects |
+| 36  | **Asteroids (Vector Arcade)** | Authentic 1979 vector arcade with autonomous ship AI, rock splitting, saucer & thruster particles |
 
 ---
 
