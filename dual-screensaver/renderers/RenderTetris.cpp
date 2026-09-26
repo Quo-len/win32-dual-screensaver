@@ -568,7 +568,6 @@ static void SpawnPiece(TetrisState& s) {
     s.pieceX = 3;
     s.pieceY = 0.0f;
     s.aiPlanReady = false;
-    s.pieceCounts[s.pieceType]++;
 
     // Check immediate top-out game over
     if (CheckCollision(s.board, s.pieceType, s.pieceRot, s.pieceX, (int)s.pieceY)) {
@@ -721,6 +720,8 @@ static void UpdateTetrisGame(TetrisState& s) {
                 s.board[by][bx] = s.pieceType;
             }
         }
+
+        s.pieceCounts[s.pieceType]++;
 
         // Check for completed lines
         s.linesToClearCount = 0;
