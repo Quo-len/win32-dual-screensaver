@@ -432,18 +432,20 @@ static void DrawSnakeCorner(SnakeState& s, int px, int py, int cornerType, bool 
         for (int x = 0; x < 8; ++x) {
             float u = (float)x;
             float v = (float)y;
+            
             switch (cornerType) {
-            case 0: // NE (connects UP and RIGHT)
-                v = 7.0f - v;
+            case 0: // NE (connects UP and RIGHT) -> Inner pivot is Top-Right (7,0)
+                u = 7.0f - u;
                 break;
-            case 1: // NW (connects UP and LEFT)
+            case 1: // NW (connects UP and LEFT) -> Inner pivot is Top-Left (0,0)
+                // u and v remain unchanged
+                break;
+            case 2: // SE (connects DOWN and RIGHT) -> Inner pivot is Bottom-Right (7,7)
                 u = 7.0f - u;
                 v = 7.0f - v;
                 break;
-            case 2: // SE (connects DOWN and RIGHT)
-                break;
-            case 3: // SW (connects DOWN and LEFT)
-                u = 7.0f - u;
+            case 3: // SW (connects DOWN and LEFT) -> Inner pivot is Bottom-Left (0,7)
+                v = 7.0f - v;
                 break;
             }
 
