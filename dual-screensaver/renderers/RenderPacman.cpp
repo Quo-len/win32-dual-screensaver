@@ -129,6 +129,10 @@ struct PacmanState {
     std::vector<uint32_t> fb;
     std::vector<int> eatenDistToGate;
 
+    // Pre-rasterized walls and gate, rebuilt only when a new maze is generated
+    std::vector<uint32_t> mazeLayer;
+    bool mazeLayerValid = false;
+
     // Pac-Man Entity
     float pacX = 0;
     float pacY = 0;
@@ -304,6 +308,7 @@ static void ComputeEatenGhostPathMap(PacmanState& s) {
 
 static void GenerateWidescreenMaze(PacmanState& s) {
     s.maze.assign(s.cols * s.rows, TILE_EMPTY);
+    s.mazeLayerValid = false;
     s.dotsRemaining = 0;
 
     int cols = s.cols;
@@ -1207,9 +1212,116 @@ static void RenderGhostSprite(PacmanState& s, const Ghost& gh) {
 // Modified: Smooth 45-degree chamfered corners for the ultra-slim maze walls.
 // ============================================================================
 static void RenderPacmanBoard(PacmanState& s) {
-    std::fill(s.fb.begin(), s.fb.end(), PAC_COL_BLACK);
+    // Walls and gate only change when a new maze is generated, so they are rasterized once and reused
+    if (!s.mazeLayerValid || s.mazeLayer.size() != s.fb.size()) {
+        std::fill(s.fb.begin(), s.fb.end(), PAC_COL_BLACK);
 
-    // 1. Top HUD
+        // 1. Ultra-Spacious Smoothed Arcade Wall Rendering
+        for (int ty = 3; ty < s.rows - 2; ++ty) {
+            for (int tx = 0; tx < s.cols; ++tx) {
+                uint8_t t = s.maze[ty * s.cols + tx];
+                int px = tx * TILE_SIZE;
+                int py = ty * TILE_SIZE;
+
+                if (t == TILE_WALL) {
+                    auto isWall = [&](int ctx, int cty) { 
+                        return GetTile(s, ctx, cty) == TILE_WALL; 
+                    };
+
+                    bool openN  = !isWall(tx,   ty-1);
+                    bool openS  = !isWall(tx,   ty+1);
+                    bool openW  = !isWall(tx-1, ty  );
+                    bool openE  = !isWall(tx+1, ty  );
+                    bool openNW = !isWall(tx-1, ty-1);
+                    bool openNE = !isWall(tx+1, ty-1);
+                    bool openSW = !isWall(tx-1, ty+1);
+                    bool openSE = !isWall(tx+1, ty+1);
+
+                    // Defines the tight 2-pixel wide solid skeleton mass with smooth chamfered edges
+                    auto isBody = [&](int x, int y) {
+                        bool sx = (x >= 3 && x <= 4) || (!openW && x < 3) || (!openE && x > 4);
+                        bool sy = (y >= 3 && y <= 4) || (!openN && y < 3) || (!openS && y > 4);
+                        bool b = sx && sy;
+                    
+                        // Concave cutouts (open outer map paths completely erase corners)
+                        if (x < 3 && y < 3 && openNW) b = false;
+                        if (x > 4 && y < 3 && openNE) b = false;
+                        if (x < 3 && y > 4 && openSW) b = false;
+                        if (x > 4 && y > 4 && openSE) b = false;
+                    
+                        // Convex corner smoothing (shaves off the sharp outer tip of a wall bend)
+                        bool gateE = (GetTile(s, tx + 1, ty) == TILE_GATE);
+                        bool gateW = (GetTile(s, tx - 1, ty) == TILE_GATE);
+                        if (openN && openW && !gateW && x == 3 && y == 3) b = false;
+                        if (openN && openE && !gateE && x == 4 && y == 3) b = false;
+                        if (openS && openW && !gateW && x == 3 && y == 4) b = false;
+                        if (openS && openE && !gateE && x == 4 && y == 4) b = false;
+                    
+                        // Concave corner smoothing (fills in the sharp inner tip of a wall bend)
+                        if (!openN && !openW && openNW && x == 2 && y == 2) b = true;
+                        if (!openN && !openE && openNE && x == 5 && y == 2) b = true;
+                        if (!openS && !openW && openSW && x == 2 && y == 5) b = true;
+                        if (!openS && !openE && openSE && x == 5 && y == 5) b = true;
+
+                        return b;
+                    };
+
+                    // Draw solid geometric perimeter
+                    for (int dy = 0; dy < 8; ++dy) {
+                        for (int dx = 0; dx < 8; ++dx) {
+                            if (isBody(dx, dy)) {
+                                // Check 4-way neighbors; if any neighbor is empty space, this is a boundary pixel
+                                if (!isBody(dx-1, dy) || !isBody(dx+1, dy) || 
+                                    !isBody(dx, dy-1) || !isBody(dx, dy+1)) {
+                                    PacPutPixel(s, px + dx, py + dy, PAC_COL_MAZE_BLUE);
+                                }
+                            }
+                        }
+                    }
+
+                    // Connect inner corner lines and fill the inner chamfer (fixes the 3-pixel gap inside corners)
+                    if (!openS && !openE && openSE) {
+                        PacPutPixel(s, px + 4, py + 4, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 5, py + 4, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 4, py + 5, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 5, py + 5, PAC_COL_MAZE_BLUE);
+                    }
+                    if (!openS && !openW && openSW) {
+                        PacPutPixel(s, px + 3, py + 4, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 2, py + 4, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 3, py + 5, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 2, py + 5, PAC_COL_MAZE_BLUE);
+                    }
+                    if (!openN && !openE && openNE) {
+                        PacPutPixel(s, px + 4, py + 3, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 5, py + 3, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 4, py + 2, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 5, py + 2, PAC_COL_MAZE_BLUE);
+                    }
+                    if (!openN && !openW && openNW) {
+                        PacPutPixel(s, px + 3, py + 3, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 2, py + 3, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 3, py + 2, PAC_COL_MAZE_BLUE);
+                        PacPutPixel(s, px + 2, py + 2, PAC_COL_MAZE_BLUE);
+                    }
+                } else if (t == TILE_GATE) {
+                    // Ghost house gate stretches fully to meet the heavily-recessed walls without any gap
+                    for (int dx = -4; dx <= 11; ++dx) {
+                        PacPutPixel(s, px + dx, py + 3, PAC_COL_GATE_PINK);
+                        PacPutPixel(s, px + dx, py + 4, PAC_COL_GATE_PINK);
+                    }
+                }
+            }
+        }
+
+        s.mazeLayer = s.fb;
+        s.mazeLayerValid = true;
+    }
+    else {
+        std::copy(s.mazeLayer.begin(), s.mazeLayer.end(), s.fb.begin());
+    }
+
+    // 2. Top HUD
     PacDrawText(s, 24, 6, "1UP", PAC_COL_WHITE);
     PacDrawText(s, s.virtualW / 2 - 30, 6, "HIGH SCORE", PAC_COL_WHITE);
     PacDrawText(s, s.virtualW - 54, 6, "2UP", PAC_COL_WHITE);
@@ -1220,104 +1332,6 @@ static void RenderPacmanBoard(PacmanState& s) {
 
     sprintf_s(scoreBuf, "%05d", s.highScore);
     PacDrawText(s, s.virtualW / 2 - 15, 15, scoreBuf, PAC_COL_WHITE);
-
-    // 2. Ultra-Spacious Smoothed Arcade Wall Rendering
-    for (int ty = 3; ty < s.rows - 2; ++ty) {
-        for (int tx = 0; tx < s.cols; ++tx) {
-            uint8_t t = s.maze[ty * s.cols + tx];
-            int px = tx * TILE_SIZE;
-            int py = ty * TILE_SIZE;
-
-            if (t == TILE_WALL) {
-                auto isWall = [&](int ctx, int cty) { 
-                    return GetTile(s, ctx, cty) == TILE_WALL; 
-                };
-
-                bool openN  = !isWall(tx,   ty-1);
-                bool openS  = !isWall(tx,   ty+1);
-                bool openW  = !isWall(tx-1, ty  );
-                bool openE  = !isWall(tx+1, ty  );
-                bool openNW = !isWall(tx-1, ty-1);
-                bool openNE = !isWall(tx+1, ty-1);
-                bool openSW = !isWall(tx-1, ty+1);
-                bool openSE = !isWall(tx+1, ty+1);
-
-                // Defines the tight 2-pixel wide solid skeleton mass with smooth chamfered edges
-                auto isBody = [&](int x, int y) {
-                    bool sx = (x >= 3 && x <= 4) || (!openW && x < 3) || (!openE && x > 4);
-                    bool sy = (y >= 3 && y <= 4) || (!openN && y < 3) || (!openS && y > 4);
-                    bool b = sx && sy;
-                    
-                    // Concave cutouts (open outer map paths completely erase corners)
-                    if (x < 3 && y < 3 && openNW) b = false;
-                    if (x > 4 && y < 3 && openNE) b = false;
-                    if (x < 3 && y > 4 && openSW) b = false;
-                    if (x > 4 && y > 4 && openSE) b = false;
-                    
-                    // Convex corner smoothing (shaves off the sharp outer tip of a wall bend)
-                    bool gateE = (GetTile(s, tx + 1, ty) == TILE_GATE);
-                    bool gateW = (GetTile(s, tx - 1, ty) == TILE_GATE);
-                    if (openN && openW && !gateW && x == 3 && y == 3) b = false;
-                    if (openN && openE && !gateE && x == 4 && y == 3) b = false;
-                    if (openS && openW && !gateW && x == 3 && y == 4) b = false;
-                    if (openS && openE && !gateE && x == 4 && y == 4) b = false;
-                    
-                    // Concave corner smoothing (fills in the sharp inner tip of a wall bend)
-                    if (!openN && !openW && openNW && x == 2 && y == 2) b = true;
-                    if (!openN && !openE && openNE && x == 5 && y == 2) b = true;
-                    if (!openS && !openW && openSW && x == 2 && y == 5) b = true;
-                    if (!openS && !openE && openSE && x == 5 && y == 5) b = true;
-
-                    return b;
-                };
-
-                // Draw solid geometric perimeter
-                for (int dy = 0; dy < 8; ++dy) {
-                    for (int dx = 0; dx < 8; ++dx) {
-                        if (isBody(dx, dy)) {
-                            // Check 4-way neighbors; if any neighbor is empty space, this is a boundary pixel
-                            if (!isBody(dx-1, dy) || !isBody(dx+1, dy) || 
-                                !isBody(dx, dy-1) || !isBody(dx, dy+1)) {
-                                PacPutPixel(s, px + dx, py + dy, PAC_COL_MAZE_BLUE);
-                            }
-                        }
-                    }
-                }
-
-                // Connect inner corner lines and fill the inner chamfer (fixes the 3-pixel gap inside corners)
-                if (!openS && !openE && openSE) {
-                    PacPutPixel(s, px + 4, py + 4, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 5, py + 4, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 4, py + 5, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 5, py + 5, PAC_COL_MAZE_BLUE);
-                }
-                if (!openS && !openW && openSW) {
-                    PacPutPixel(s, px + 3, py + 4, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 2, py + 4, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 3, py + 5, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 2, py + 5, PAC_COL_MAZE_BLUE);
-                }
-                if (!openN && !openE && openNE) {
-                    PacPutPixel(s, px + 4, py + 3, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 5, py + 3, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 4, py + 2, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 5, py + 2, PAC_COL_MAZE_BLUE);
-                }
-                if (!openN && !openW && openNW) {
-                    PacPutPixel(s, px + 3, py + 3, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 2, py + 3, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 3, py + 2, PAC_COL_MAZE_BLUE);
-                    PacPutPixel(s, px + 2, py + 2, PAC_COL_MAZE_BLUE);
-                }
-            } else if (t == TILE_GATE) {
-                // Ghost house gate stretches fully to meet the heavily-recessed walls without any gap
-                for (int dx = -4; dx <= 11; ++dx) {
-                    PacPutPixel(s, px + dx, py + 3, PAC_COL_GATE_PINK);
-                    PacPutPixel(s, px + dx, py + 4, PAC_COL_GATE_PINK);
-                }
-            }
-        }
-    }
 
     // 3. Pellets and Power Pellets
     bool flashEnergizer = ((GetTickCount64() / 200) % 2 == 0);

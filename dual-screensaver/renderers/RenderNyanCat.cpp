@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <algorithm>
 
 struct NyanStar {
@@ -357,6 +358,11 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
     }
 
     // 10. Ultra-High Performance Span-Batched GDI Rendering
+    // Fill the space background once; spans that are only blank space on it are then skipped
+    RECT spaceRect = { 0, 0, numCells * 2 * cW, rows * cH };
+    SetDCBrushColor(memDC, COL_SPACE_BG);
+    FillRect(memDC, &spaceRect, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+
     for (int y = 0; y < rows; ++y) {
         int x = 0;
         while (x < numCells) {
@@ -376,6 +382,8 @@ void RenderNyanCat(HDC memDC, ScreenData* data, int width, int height, const REC
                 x++;
             }
             span[spanLen] = '\0';
+
+            if (curBg == COL_SPACE_BG && strspn(span, " ") == static_cast<size_t>(spanLen)) continue;
 
             SetTextColor(memDC, curFg);
             SetBkColor(memDC, curBg);

@@ -214,8 +214,10 @@ struct AsteroidsState {
 // TOROIDAL WRAP-AROUND SPACE CALCULATIONS
 // ============================================================================
 static inline float WrapCoord(float val, float maxVal) {
-    while (val < 0.0f) val += maxVal;
-    while (val >= maxVal) val -= maxVal;
+    if (val >= 0.0f && val < maxVal) return val;
+    val = std::fmod(val, maxVal);
+    if (val < 0.0f) val += maxVal;
+    if (val >= maxVal) val -= maxVal;
     return val;
 }
 
@@ -851,13 +853,17 @@ static void StepAsteroidsSimulation(AsteroidsState& s) {
                     s.sparks.push_back({ a.x, a.y, std::cos(sAngle) * sSpd, std::sin(sAngle) * sSpd, 0, 16, COL_GRAY_LIGHT });
                 }
 
-                // Split into smaller asteroids
-                if (a.tier == AST_LARGE) {
-                    SpawnAsteroid(s, a.x, a.y, AST_MEDIUM);
-                    SpawnAsteroid(s, a.x, a.y, AST_MEDIUM);
-                } else if (a.tier == AST_MEDIUM) {
-                    SpawnAsteroid(s, a.x, a.y, AST_SMALL);
-                    SpawnAsteroid(s, a.x, a.y, AST_SMALL);
+                // Split into smaller asteroids. SpawnAsteroid appends to s.asteroids and may
+                // reallocate it, so `a` must not be read after the first spawn.
+                const float splitX = a.x;
+                const float splitY = a.y;
+                const AsteroidTier splitTier = a.tier;
+                if (splitTier == AST_LARGE) {
+                    SpawnAsteroid(s, splitX, splitY, AST_MEDIUM);
+                    SpawnAsteroid(s, splitX, splitY, AST_MEDIUM);
+                } else if (splitTier == AST_MEDIUM) {
+                    SpawnAsteroid(s, splitX, splitY, AST_SMALL);
+                    SpawnAsteroid(s, splitX, splitY, AST_SMALL);
                 }
                 break;
             }

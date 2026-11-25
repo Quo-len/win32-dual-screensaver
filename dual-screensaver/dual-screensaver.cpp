@@ -31,7 +31,6 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL CALLBACK       MonitorEnumProc(HMONITOR, HDC, LPRECT, LPARAM);
-LRESULT CALLBACK    ConfigWindowProc(HWND, UINT, WPARAM, LPARAM);
 
 
 

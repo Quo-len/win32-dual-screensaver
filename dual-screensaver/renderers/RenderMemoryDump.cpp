@@ -10,7 +10,29 @@ struct MemoryDumpState {
     int lastWidth = 0;
     int lastHeight = 0;
 
+    // The dump only changes when baseAddress advances (every other frame), so the
+    // finished frame is kept and reused in between.
+    HDC cacheDC = nullptr;
+    HBITMAP cacheBmp = nullptr;
+    HGDIOBJ cacheOldBmp = nullptr;
+    uint64_t cachedAddress = 0;
+    bool cacheValid = false;
+
+    void ReleaseCache() {
+        if (cacheDC) {
+            SelectObject(cacheDC, cacheOldBmp);
+            DeleteDC(cacheDC);
+            cacheDC = nullptr;
+        }
+        if (cacheBmp) {
+            DeleteObject(cacheBmp);
+            cacheBmp = nullptr;
+        }
+        cacheValid = false;
+    }
+
     ~MemoryDumpState() {
+        ReleaseCache();
         if (hFont) DeleteObject(hFont);
     }
 };
@@ -28,8 +50,19 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             FIXED_PITCH | FF_MODERN, "Consolas");
 
+        state.ReleaseCache();
         state.lastWidth = width;
         state.lastHeight = height;
+    }
+
+    if (++state.scrollDelay > 1) {
+        state.baseAddress += 16;
+        state.scrollDelay = 0;
+    }
+
+    if (state.cacheValid && state.cachedAddress == state.baseAddress) {
+        BitBlt(memDC, 0, 0, width, height, state.cacheDC, 0, 0, SRCCOPY);
+        return;
     }
 
     SelectObject(memDC, state.hFont);
@@ -45,11 +78,6 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
 
     int startX = (width - (78 * cWidth)) / 2;
     if (startX < 0) startX = 0;
-
-    if (++state.scrollDelay > 1) {
-        state.baseAddress += 16;
-        state.scrollDelay = 0;
-    }
 
     uint32_t seed = (uint32_t)(state.baseAddress ^ (state.baseAddress >> 32));
     uint64_t currentAddr = state.baseAddress;
@@ -97,6 +125,15 @@ void RenderMemoryDump(HDC memDC, ScreenData* data, int width, int height, const 
 
         currentAddr += 16;
     }
+
+    if (!state.cacheDC) {
+        state.cacheDC = CreateCompatibleDC(memDC);
+        state.cacheBmp = CreateCompatibleBitmap(memDC, width, height);
+        state.cacheOldBmp = SelectObject(state.cacheDC, state.cacheBmp);
+    }
+    BitBlt(state.cacheDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+    state.cachedAddress = state.baseAddress;
+    state.cacheValid = true;
 }
 
 REGISTER_SCREENSAVER(
