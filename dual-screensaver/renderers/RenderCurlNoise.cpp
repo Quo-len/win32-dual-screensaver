@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include "../settings/CurlSettings.h"
 #include "../utils/Perlin.h"
+#include "PixelCanvas.h"
 #include <math.h>
 
 struct FlowParticle {
@@ -51,18 +52,7 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
     
     // Fade the background slightly each frame for the trailing effect
     const int fadeSpeed = 4;
-    for (int i = 0; i < totalPixels; i++) {
-        uint32_t c = px[i];
-        int r = (c >> 16) & 0xFF;
-        int g = (c >> 8) & 0xFF;
-        int b = c & 0xFF;
-
-        r = (r > fadeSpeed) ? r - fadeSpeed : 0;
-        g = (g > fadeSpeed) ? g - fadeSpeed : 0;
-        b = (b > fadeSpeed) ? b - fadeSpeed : 0;
-
-        px[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
+    FadePixels(px, static_cast<size_t>(totalPixels), fadeSpeed);
 
     // Slowly move forward in the Z axis of the noise field
     state.flowZOff += 0.001f;
@@ -141,17 +131,7 @@ void RenderCurlNoise(HDC memDC, ScreenData* data, int width, int height, const R
         p.prev_y = p.y;
     }
 
-    // Blit the pixel buffer to the device context
-    BITMAPINFO bmi = { 0 };
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // Top-down
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    SetDIBitsToDevice(memDC, rect.left, rect.top, width, height,
-        0, 0, 0, height, data->pixels.data(), &bmi, DIB_RGB_COLORS);
+    PresentPixels(memDC, rect.left, rect.top, data->pixels.data(), width, height);
 }
 
 REGISTER_SCREENSAVER(21, L"Curl Noise Particles", "curl", { "curl", "noise", "particles" }, WRAP_LEGACY(RenderCurlNoise), GetCurlSettings());

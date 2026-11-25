@@ -2,12 +2,17 @@
 #include "ScreensaverRegistry.h"
 #include "ScreenData.h"
 #include "Settings.h"
+#include "GlyphAtlas.h"
 #include <math.h>
 #include <vector>
-#include <string>
 
 struct JuliaState {
     float A = 0.0f;
+    std::vector<char> b;
+    GlyphAtlas atlas;
+    HFONT atlasFont = NULL;
+    CenteredTextBlock layout;
+    PixelCanvas canvas;
 };
 
 void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
@@ -22,7 +27,8 @@ void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT&
     if (W <= 0) W = 1;
     if (H <= 0) H = 1;
 
-    std::vector<char> b(W * H, ' ');
+    std::vector<char>& b = state.b;
+    b.assign(W * H, ' ');
 
     double zoom = 1.0 + 0.15 * sin(state.A * 0.3);
     double widthInComplex = 3.5 / zoom;
@@ -61,23 +67,23 @@ void RenderJulia(HDC memDC, ScreenData* data, int width, int height, const RECT&
         }
     }
 
-    std::string out;
-    out.reserve(W * H + H);
-    for (int k = 0; k < W * H; k++) {
-        out += b[k];
-        if ((k + 1) % W == 0) out += '\n';
+    if (state.atlasFont != data->hFont) {
+        state.atlas.Build(memDC, data->hFont, L' ', 95);
+        state.atlasFont = data->hFont;
     }
+    state.layout.Update(memDC, rect, W, H);
+    state.canvas.Begin(width, height);
 
-    SetTextColor(memDC, RGB(255, 255, 255));
-    SetBkMode(memDC, TRANSPARENT);
-
-    RECT calcRect = rect;
-    DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
-
-    int textHeight = calcRect.bottom - calcRect.top;
-    RECT textRect = rect;
-    textRect.top = (textRect.bottom - textHeight) / 2;
-    DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
+    const int charW = tm.tmAveCharWidth;
+    const int charH = tm.tmHeight;
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            char c = b[y * W + x];
+            if (c == ' ') continue;
+            state.atlas.Draw(state.canvas, state.layout.x + x * charW, state.layout.y + y * charH, c - ' ', 0xFFFFFF);
+        }
+    }
+    state.canvas.End(memDC, rect.left, rect.top);
 
     state.A += g_ASpeed * 0.5f;
 }

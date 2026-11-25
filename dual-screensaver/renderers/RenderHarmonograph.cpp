@@ -15,6 +15,7 @@
 #include "framework.h"
 #include "ScreensaverRegistry.h"
 #include "ScreenData.h"
+#include "PixelCanvas.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -183,16 +184,7 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
     // -------------------------------------------------------------------
     // Very slow fade — persistence ~5 s, long luminous trails
     // -------------------------------------------------------------------
-    for (int i = 0; i < total; i++) {
-        uint32_t c = px[i];
-        int r = (int)((c >> 16) & 0xFF);
-        int g = (int)((c >>  8) & 0xFF);
-        int b = (int)( c        & 0xFF);
-        r = (r > 1) ? r - 1 : 0;
-        g = (g > 1) ? g - 1 : 0;
-        b = (b > 1) ? b - 1 : 0;
-        px[i] = 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
-    }
+    FadePixels(px, static_cast<size_t>(total), 1);
 
     // -------------------------------------------------------------------
     // Delta time
@@ -299,17 +291,7 @@ void RenderHarmonograph(HDC memDC, ScreenData* data, int width, int height, cons
     // -------------------------------------------------------------------
     // Blit to screen
     // -------------------------------------------------------------------
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth       = width;
-    bmi.bmiHeader.biHeight      = -height;
-    bmi.bmiHeader.biPlanes      = 1;
-    bmi.bmiHeader.biBitCount    = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    StretchDIBits(memDC, 0, 0, width, height,
-                  0, 0, width, height,
-                  px, &bmi, DIB_RGB_COLORS, SRCCOPY);
+    PresentPixels(memDC, 0, 0, px, width, height);
 }
 
 REGISTER_SCREENSAVER(22, L"Harmonograph", "harmonograph", { "harmonograph", "harmo" }, WRAP_LEGACY(RenderHarmonograph), {});

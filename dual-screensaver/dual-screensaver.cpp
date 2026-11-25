@@ -327,9 +327,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		int width = rect.right - rect.left;
 		int height = rect.bottom - rect.top;
 
-		HDC memDC = CreateCompatibleDC(hdc);
-		HBITMAP hMemBmp = CreateCompatibleBitmap(hdc, width, height);
-		HBITMAP hOldBmp = (HBITMAP)SelectObject(memDC, hMemBmp);
+		if (!data->backDC || data->backW != width || data->backH != height) {
+			data->ReleaseBackBuffer();
+			data->backDC = CreateCompatibleDC(hdc);
+			data->backBmp = CreateCompatibleBitmap(hdc, width, height);
+			data->backOldBmp = SelectObject(data->backDC, data->backBmp);
+			data->backW = width;
+			data->backH = height;
+		}
+		HDC memDC = data->backDC;
+		int savedDC = SaveDC(memDC);
 
 		FillRect(memDC, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
 		SetBkMode(memDC, OPAQUE);
@@ -386,9 +393,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
-		SelectObject(memDC, hOldBmp);
-		DeleteObject(hMemBmp);
-		DeleteDC(memDC);
+		RestoreDC(memDC, savedDC);
 
 		EndPaint(hWnd, &ps);
 	}
@@ -418,6 +423,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_DESTROY:
 		if (data) {
+			data->ReleaseBackBuffer();
 			if (data->hFont) DeleteObject(data->hFont);
 			delete data;
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);

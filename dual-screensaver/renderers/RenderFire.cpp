@@ -1,19 +1,22 @@
 #include "framework.h"
 #include "ScreensaverRegistry.h"
 #include "ScreenData.h"
+#include "GlyphAtlas.h"
 #include <string.h>
 
 struct FireState {
     int width = 0;
     int height = 0;
     std::vector<int> grid;
+    GlyphAtlas atlas;
+    HFONT atlasFont = NULL;
+    PixelCanvas canvas;
 };
 
 void RenderFire(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
     auto& state = data->GetCustomState<FireState>(13);
 
     SelectObject(memDC, data->hFont);
-    SetBkMode(memDC, TRANSPARENT);
 
     TEXTMETRIC tm;
     GetTextMetrics(memDC, &tm);
@@ -43,23 +46,30 @@ void RenderFire(HDC memDC, ScreenData* data, int width, int height, const RECT& 
 
     const char chars[] = " .:^*xsS#$";
 
+    if (state.atlasFont != data->hFont) {
+        state.atlas.Build(memDC, data->hFont, L' ', 95);
+        state.atlasFont = data->hFont;
+    }
+    state.canvas.Begin(width, height);
+
     for (int i = 0; i < size - 1; i++) {
         int heat = state.grid[i];
 
-        COLORREF color;
-        if (heat > 15) color = RGB(99, 143, 189);
-        else if (heat > 9) color = RGB(255, 255, 85);
-        else if (heat > 4) color = RGB(255, 85, 85);
-        else color = RGB(128, 128, 128);
+        uint32_t color;
+        if (heat > 15) color = 0x638FBD;
+        else if (heat > 9) color = 0xFFFF55;
+        else if (heat > 4) color = 0xFF5555;
+        else color = 0x808080;
 
         int charIdx = (heat > 9) ? 9 : heat;
         char c = chars[charIdx];
 
         if (c != ' ') {
-            SetTextColor(memDC, color);
-            TextOutA(memDC, (i % state.width) * cWidth, (i / state.width) * cHeight, &c, 1);
+            state.atlas.Draw(state.canvas, (i % state.width) * cWidth, (i / state.width) * cHeight, c - ' ', color);
         }
     }
+
+    state.canvas.End(memDC, rect.left, rect.top);
 }
 
 REGISTER_SCREENSAVER(

@@ -2,20 +2,24 @@
 #include "ScreensaverRegistry.h"
 #include "ScreenData.h"
 #include "Settings.h"
+#include "GlyphAtlas.h"
+#include <vector>
+
+constexpr int MATRIX_GLYPH_COUNT = 96;
+constexpr wchar_t MATRIX_GLYPH_BASE = 0x30A0;
 
 struct MatrixState {
     std::vector<int> drops;
-    std::vector<wchar_t> chars;
+    std::vector<unsigned char> glyphs;
     std::vector<unsigned char> intensity;
-    HFONT hFont = nullptr;
-    int lastFontSize = 0;
 
-    ~MatrixState() {
-        if (hFont) DeleteObject(hFont);
-    }
+    GlyphAtlas atlas;
+    int atlasFontSize = 0;
+    PixelCanvas canvas;
 };
 
 void RenderMatrix(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
+    if (width <= 0 || height <= 0) return;
     auto& state = data->GetCustomState<MatrixState>(2);
 
     int m_fontSize = data->isPreview ? 10 : g_TextSize;
@@ -27,9 +31,9 @@ void RenderMatrix(HDC memDC, ScreenData* data, int width, int height, const RECT
     if (m_cols <= 0) m_cols = 1;
     if (m_rows <= 0) m_rows = 1;
 
-    if (state.drops.size() != (size_t)m_cols || state.chars.size() != (size_t)(m_cols * m_rows)) {
+    if (state.drops.size() != (size_t)m_cols || state.glyphs.size() != (size_t)(m_cols * m_rows)) {
         state.drops.assign(m_cols, 0);
-        state.chars.assign(m_cols * m_rows, L' ');
+        state.glyphs.assign(m_cols * m_rows, 0);
         state.intensity.assign(m_cols * m_rows, 0);
         for (int i = 0; i < m_cols; ++i) state.drops[i] = rand() % m_rows;
     }
@@ -46,7 +50,7 @@ void RenderMatrix(HDC memDC, ScreenData* data, int width, int height, const RECT
         int headY = state.drops[x];
         if (headY >= 0 && headY < m_rows) {
             int idx = headY * m_cols + x;
-            state.chars[idx] = 0x30A0 + (rand() % 96);
+            state.glyphs[idx] = static_cast<unsigned char>(rand() % MATRIX_GLYPH_COUNT);
             state.intensity[idx] = 255;
         }
 
@@ -56,28 +60,29 @@ void RenderMatrix(HDC memDC, ScreenData* data, int width, int height, const RECT
         }
     }
 
-    if (!state.hFont || state.lastFontSize != m_fontSize) {
-        if (state.hFont) DeleteObject(state.hFont);
-        state.hFont = CreateFontW(m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
+    if (state.atlasFontSize != m_fontSize) {
+        HFONT hFont = CreateFontW(m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET,
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
             FIXED_PITCH | FF_MODERN, L"MS Gothic");
-        state.lastFontSize = m_fontSize;
+        state.atlas.Build(memDC, hFont, MATRIX_GLYPH_BASE, MATRIX_GLYPH_COUNT);
+        DeleteObject(hFont);
+        state.atlasFontSize = m_fontSize;
     }
 
-    SelectObject(memDC, state.hFont);
-    SetBkMode(memDC, TRANSPARENT);
+    state.canvas.Begin(width, height);
 
     for (int y = 0; y < m_rows; y++) {
         for (int x = 0; x < m_cols; x++) {
             int idx = y * m_cols + x;
             int brightness = state.intensity[idx];
-            if (brightness > 0) {
-                COLORREF color = (brightness > 240) ? RGB(200, 255, 200) : RGB(0, brightness, 0);
-                SetTextColor(memDC, color);
-                TextOutW(memDC, x * m_fontSize, y * m_fontSize, &state.chars[idx], 1);
-            }
+            if (brightness == 0) continue;
+            // Bright head, green fading tail
+            uint32_t color = (brightness > 240) ? 0xC8FFC8 : (static_cast<uint32_t>(brightness) << 8);
+            state.atlas.Draw(state.canvas, x * m_fontSize, y * m_fontSize, state.glyphs[idx], color);
         }
     }
+
+    state.canvas.End(memDC, rect.left, rect.top);
 }
 
 REGISTER_SCREENSAVER(

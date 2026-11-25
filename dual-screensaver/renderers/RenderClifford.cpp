@@ -1,6 +1,7 @@
 #include "framework.h"
 #include "ScreensaverRegistry.h"
 #include "ScreenData.h"
+#include "PixelCanvas.h"
 #include <math.h>
 
 #ifndef max
@@ -34,18 +35,7 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
     const int fadeSpeed = 4; // slow fade for trails
 
     // Fade the buffer
-    for (int i = 0; i < totalPixels; i++) {
-        uint32_t c = px[i];
-        int r = (c >> 16) & 0xFF;
-        int g = (c >> 8) & 0xFF;
-        int b = c & 0xFF;
-
-        r = (r > fadeSpeed) ? r - fadeSpeed : 0;
-        g = (g > fadeSpeed) ? g - fadeSpeed : 0;
-        b = (b > fadeSpeed) ? b - fadeSpeed : 0;
-
-        px[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
+    FadePixels(px, static_cast<size_t>(totalPixels), fadeSpeed);
 
     // Time-based parameter animation
     DWORD now = GetTickCount();
@@ -110,17 +100,7 @@ void RenderClifford(HDC memDC, ScreenData* data, int width, int height, const RE
     state.x = x;
     state.y = y;
 
-    // Render buffer to screen
-    BITMAPINFO bmi = { 0 };
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // top-down DIB
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    StretchDIBits(memDC, 0, 0, width, height,
-        0, 0, width, height, px, &bmi, DIB_RGB_COLORS, SRCCOPY);
+    PresentPixels(memDC, 0, 0, px, width, height);
 }
 
 REGISTER_SCREENSAVER(20, L"Clifford Attractor", "clifford", { "clifford", "attractor" }, WRAP_LEGACY(RenderClifford), {});

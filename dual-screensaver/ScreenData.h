@@ -24,6 +24,27 @@ struct ScreenData {
     std::vector<uint32_t> pixels;
     HFONT hFont = NULL;
 
+    // Persistent off-screen back buffer, recreated only when the window size changes
+    HDC backDC = NULL;
+    HBITMAP backBmp = NULL;
+    HGDIOBJ backOldBmp = NULL;
+    int backW = 0;
+    int backH = 0;
+
+    void ReleaseBackBuffer() {
+        if (backDC) {
+            SelectObject(backDC, backOldBmp);
+            DeleteDC(backDC);
+            backDC = NULL;
+        }
+        if (backBmp) {
+            DeleteObject(backBmp);
+            backBmp = NULL;
+        }
+        backOldBmp = NULL;
+        backW = backH = 0;
+    }
+
     // Type-safe per-screensaver isolated state cache
     std::shared_ptr<void> customState = nullptr;
     int customStateMode = -1;

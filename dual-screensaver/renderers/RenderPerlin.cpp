@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include "../settings/PerlinSettings.h"
 #include "../utils/Perlin.h"
+#include "PixelCanvas.h"
 #include <math.h>
 
 struct FlowParticle {
@@ -50,19 +51,7 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
     int totalPixels = width * height;
     const int fadeSpeed = 6;
 
-    for (int i = 0; i < totalPixels; i++) {
-        uint32_t c = px[i];
-
-        int r = (c >> 16) & 0xFF;
-        int g = (c >> 8) & 0xFF;
-        int b = c & 0xFF;
-
-        r = (r > fadeSpeed) ? r - fadeSpeed : 0;
-        g = (g > fadeSpeed) ? g - fadeSpeed : 0;
-        b = (b > fadeSpeed) ? b - fadeSpeed : 0;
-
-        px[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
+    FadePixels(px, static_cast<size_t>(totalPixels), fadeSpeed);
 
     state.flowZOff += 0.003f;
     const float PI = 3.14159265358979323846f;
@@ -116,16 +105,7 @@ void RenderPerlin(HDC memDC, ScreenData* data, int width, int height, const RECT
         }
     }
 
-    BITMAPINFO bmi = { 0 };
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    StretchDIBits(memDC, 0, 0, width, height,
-        0, 0, width, height, data->pixels.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
+    PresentPixels(memDC, 0, 0, data->pixels.data(), width, height);
 }
 
 REGISTER_SCREENSAVER(

@@ -3,12 +3,17 @@
 #include "ScreenData.h"
 #include "Settings.h"
 #include "../settings/EarthSettings.h"
+#include "GlyphAtlas.h"
 #include <math.h>
 #include <vector>
-#include <string>
 
 struct EarthState {
     float angle = 0.0f;
+    std::vector<char> b;
+    GlyphAtlas atlas;
+    HFONT atlasFont = NULL;
+    CenteredTextBlock layout;
+    PixelCanvas canvas;
 };
 
 void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT& rect) {
@@ -23,7 +28,8 @@ void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT&
     if (W <= 0) W = 1;
     if (H <= 0) H = 1;
 
-    std::vector<char> b(W * H, ' ');
+    std::vector<char>& b = state.b;
+    b.assign(W * H, ' ');
 
     float R_x = min(W / 2.0f, H * 1.0f) * 0.9f;
     float R_y = R_x * 0.5f;
@@ -94,21 +100,23 @@ void RenderEarth(HDC memDC, ScreenData* data, int width, int height, const RECT&
         }
     }
 
-    std::string out;
-    out.reserve(W * H + H);
-    for (int k = 0; k < W * H; k++) {
-        out += b[k];
-        if ((k + 1) % W == 0) out += '\n';
+    if (state.atlasFont != data->hFont) {
+        state.atlas.Build(memDC, data->hFont, L' ', 95);
+        state.atlasFont = data->hFont;
     }
+    state.layout.Update(memDC, rect, W, H);
+    state.canvas.Begin(width, height);
 
-    SetTextColor(memDC, RGB(0, 255, 0));
-    RECT calcRect = rect;
-    DrawTextA(memDC, out.c_str(), -1, &calcRect, DT_CALCRECT | DT_CENTER);
-
-    int textHeight = calcRect.bottom - calcRect.top;
-    RECT textRect = rect;
-    textRect.top = (textRect.bottom - textHeight) / 2;
-    DrawTextA(memDC, out.c_str(), -1, &textRect, DT_CENTER);
+    const int charW = tm.tmAveCharWidth;
+    const int charH = tm.tmHeight;
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            char c = b[y * W + x];
+            if (c == ' ') continue;
+            state.atlas.Draw(state.canvas, state.layout.x + x * charW, state.layout.y + y * charH, c - ' ', 0x00FF00);
+        }
+    }
+    state.canvas.End(memDC, rect.left, rect.top);
 
     state.angle += g_EarthSpeed;
 }
