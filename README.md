@@ -58,6 +58,7 @@ A high-performance, native Win32 C++20 multi-monitor screensaver engine for Wind
 | 34  | **Maze Generator (Legacy)** | Classic depth-first search labyrinth generation & traversal             |
 | 35  | **Arkanoid (Breakout Neon)** | Autonomous cyber breakout arcade with physics, neon glows & brick effects |
 | 36  | **Asteroids (Vector Arcade)** | Authentic 1979 vector arcade with autonomous ship AI, rock splitting, saucer & thruster particles |
+| 37  | **Stone Dungeon Walk**      | First-person procedural 3D stone dungeon crawler with torchlight & minimap  |
 
 ---
 
